@@ -29,10 +29,13 @@ func (s *TutorialServiceServer) SetTutorialProgress(ctx context.Context, req *pb
 	nowMillis := gametime.NowMillis()
 	var grants []questflow.RewardGrant
 	user, _ := s.users.UpdateUser(userId, func(user *store.UserState) {
-		user.Tutorials[req.TutorialType] = store.TutorialProgressState{
-			TutorialType:  req.TutorialType,
-			ProgressPhase: req.ProgressPhase,
-			ChoiceId:      req.ChoiceId,
+		existing, exists := user.Tutorials[req.TutorialType]
+		if !exists || req.ProgressPhase >= existing.ProgressPhase {
+			user.Tutorials[req.TutorialType] = store.TutorialProgressState{
+				TutorialType:  req.TutorialType,
+				ProgressPhase: req.ProgressPhase,
+				ChoiceId:      req.ChoiceId,
+			}
 		}
 		if req.TutorialType == int32(model.TutorialTypeMenuFirst) ||
 			req.TutorialType == int32(model.TutorialTypeMenuSecond) {
@@ -74,9 +77,12 @@ func (s *TutorialServiceServer) SetTutorialProgressAndReplaceDeck(ctx context.Co
 	log.Printf("[TutorialService] SetTutorialProgressAndReplaceDeck: type=%d phase=%d deckType=%d deckNumber=%d", req.TutorialType, req.ProgressPhase, req.DeckType, req.UserDeckNumber)
 	userId := currentUserId(ctx, s.users, s.sessions)
 	user, _ := s.users.UpdateUser(userId, func(user *store.UserState) {
-		user.Tutorials[req.TutorialType] = store.TutorialProgressState{
-			TutorialType:  req.TutorialType,
-			ProgressPhase: req.ProgressPhase,
+		existing, exists := user.Tutorials[req.TutorialType]
+		if !exists || req.ProgressPhase >= existing.ProgressPhase {
+			user.Tutorials[req.TutorialType] = store.TutorialProgressState{
+				TutorialType:  req.TutorialType,
+				ProgressPhase: req.ProgressPhase,
+			}
 		}
 		if req.Deck != nil {
 			store.ApplyDeckReplacement(user, model.DeckType(req.DeckType), req.UserDeckNumber, deckSlotsFromProto(req.Deck), gametime.NowMillis())
