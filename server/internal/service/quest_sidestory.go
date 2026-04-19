@@ -24,7 +24,7 @@ func NewSideStoryQuestServiceServer(users store.UserRepository, sessions store.S
 }
 
 func buildSideStoryDiff(user store.UserState, tableNames []string) map[string]*pb.DiffData {
-	tables := userdata.SelectTables(userdata.FullClientTableMap(user), tableNames)
+	tables := userdata.ProjectTables(user, tableNames)
 	return userdata.BuildDiffFromTablesOrdered(tables, tableNames)
 }
 

@@ -24,13 +24,12 @@ func (s *MissionServiceServer) UpdateMissionProgress(ctx context.Context, req *p
 	log.Printf("[MissionService] UpdateMissionProgress: cage=%v pictureBook=%v", req.CageMeasurableValues, req.PictureBookMeasurableValues)
 
 	userId := currentUserId(ctx, s.users, s.sessions)
-	snapshot, err := s.users.SnapshotUser(userId)
+	snapshot, err := s.users.LoadUser(userId)
 	if err != nil {
 		return nil, fmt.Errorf("snapshot user: %w", err)
 	}
 
-	tables := userdata.FullClientTableMap(snapshot)
-	diff := userdata.BuildDiffFromTables(userdata.SelectTables(tables, []string{"IUserMission"}))
+	diff := userdata.BuildDiffFromTables(userdata.ProjectTables(snapshot, []string{"IUserMission"}))
 
 	return &pb.UpdateMissionProgressResponse{
 		DiffUserData: diff,

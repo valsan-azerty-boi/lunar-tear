@@ -30,8 +30,7 @@ func (s *PortalCageServiceServer) UpdatePortalCageSceneProgress(ctx context.Cont
 		user.PortalCageStatus.LatestVersion = now
 	})
 
-	tables := userdata.SelectTables(
-		userdata.FullClientTableMap(user),
+	tables := userdata.ProjectTables(user,
 		[]string{"IUserPortalCageStatus"},
 	)
 	return &pb.UpdatePortalCageSceneProgressResponse{

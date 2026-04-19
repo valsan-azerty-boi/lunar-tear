@@ -71,8 +71,7 @@ func (s *ExploreServiceServer) StartExplore(ctx context.Context, req *pb.StartEx
 		return nil, fmt.Errorf("start explore: %w", err)
 	}
 
-	tables := userdata.FullClientTableMap(snapshot)
-	diff := userdata.BuildDiffFromTables(userdata.SelectTables(tables, exploreDiffTables))
+	diff := userdata.BuildDiffFromTables(userdata.ProjectTables(snapshot, exploreDiffTables))
 
 	return &pb.StartExploreResponse{
 		DiffUserData: diff,
@@ -124,8 +123,7 @@ func (s *ExploreServiceServer) FinishExplore(ctx context.Context, req *pb.Finish
 		return nil, fmt.Errorf("finish explore: %w", err)
 	}
 
-	tables := userdata.FullClientTableMap(snapshot)
-	diff := userdata.BuildDiffFromTables(userdata.SelectTables(tables, exploreFinishDiffTables))
+	diff := userdata.BuildDiffFromTables(userdata.ProjectTables(snapshot, exploreFinishDiffTables))
 
 	rewards := []*pb.ExploreReward{
 		{
@@ -161,8 +159,7 @@ func (s *ExploreServiceServer) RetireExplore(ctx context.Context, req *pb.Retire
 		return nil, fmt.Errorf("retire explore: %w", err)
 	}
 
-	tables := userdata.FullClientTableMap(snapshot)
-	diff := userdata.BuildDiffFromTables(userdata.SelectTables(tables, []string{"IUserExplore"}))
+	diff := userdata.BuildDiffFromTables(userdata.ProjectTables(snapshot, []string{"IUserExplore"}))
 
 	return &pb.RetireExploreResponse{
 		DiffUserData: diff,

@@ -1,4 +1,7 @@
 #!/usr/bin/env sh
+set -e
 
-./lunar-tear --host "${LUNAR_HOST}" --http-port "${LUNAR_HTTP_PORT}" --scene "${LUNAR_SCENE}"
+mkdir -p db
+goose -dir migrations sqlite3 db/game.db up
 
+exec ./lunar-tear --host "${LUNAR_HOST}" --http-port "${LUNAR_HTTP_PORT}"

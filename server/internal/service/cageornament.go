@@ -43,8 +43,7 @@ func (s *CageOrnamentServiceServer) ReceiveReward(ctx context.Context, req *pb.R
 		s.granter.GrantFull(user, model.PossessionType(reward.PossessionType), reward.PossessionId, reward.Count, nowMillis)
 	})
 
-	diff := userdata.BuildDiffFromTables(userdata.SelectTables(
-		userdata.FullClientTableMap(user),
+	diff := userdata.BuildDiffFromTables(userdata.ProjectTables(user,
 		[]string{
 			"IUserMaterial", "IUserConsumableItem", "IUserGem",
 			"IUserCostume", "IUserCostumeActiveSkill", "IUserCharacter",
@@ -82,8 +81,7 @@ func (s *CageOrnamentServiceServer) RecordAccess(ctx context.Context, req *pb.Re
 		}
 	})
 
-	diff := userdata.BuildDiffFromTables(userdata.SelectTables(
-		userdata.FullClientTableMap(user),
+	diff := userdata.BuildDiffFromTables(userdata.ProjectTables(user,
 		[]string{"IUserCageOrnamentReward"},
 	))
 

@@ -106,7 +106,7 @@ func (s *RewardServiceServer) ReceiveBigHuntReward(ctx context.Context, _ *empty
 		weeklyScoreResults = []*pb.WeeklyScoreResult{}
 	}
 
-	tables := userdata.SelectTables(userdata.FullClientTableMap(user), []string{
+	tables := userdata.ProjectTables(user, []string{
 		"IUserBigHuntWeeklyStatus",
 		"IUserBigHuntWeeklyMaxScore",
 		"IUserConsumableItem",

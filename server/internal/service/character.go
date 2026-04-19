@@ -35,7 +35,7 @@ func (s *CharacterServiceServer) Rebirth(ctx context.Context, req *pb.RebirthReq
 		return &pb.RebirthResponse{}, nil
 	}
 
-	oldUser, _ := s.users.SnapshotUser(userId)
+	oldUser, _ := s.users.LoadUser(userId)
 	tracker := userdata.NewDeleteTracker().
 		Track("IUserMaterial", oldUser, userdata.SortedMaterialRecords, []string{"userId", "materialId"})
 
@@ -78,7 +78,7 @@ func (s *CharacterServiceServer) Rebirth(ctx context.Context, req *pb.RebirthReq
 	}
 
 	rebirthTables := []string{"IUserCharacterRebirth", "IUserMaterial", "IUserConsumableItem"}
-	tables := userdata.SelectTables(userdata.FullClientTableMap(snapshot), rebirthTables)
+	tables := userdata.ProjectTables(snapshot, rebirthTables)
 	diff := tracker.Apply(snapshot, tables)
 
 	return &pb.RebirthResponse{DiffUserData: diff}, nil

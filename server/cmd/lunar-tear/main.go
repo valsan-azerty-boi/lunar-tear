@@ -3,23 +3,21 @@ package main
 import (
 	"flag"
 	"log"
-	"os"
 	"strconv"
 	"strings"
 
+	"lunar-tear/server/internal/database"
 	"lunar-tear/server/internal/gacha"
 	"lunar-tear/server/internal/gametime"
 	"lunar-tear/server/internal/masterdata"
 	"lunar-tear/server/internal/questflow"
-	"lunar-tear/server/internal/store/memory"
+	"lunar-tear/server/internal/store/sqlite"
 )
 
 func main() {
 	httpPort := flag.Int("http-port", 8080, "HTTP server port (Octo API)")
 	host := flag.String("host", "127.0.0.1", "hostname the client will connect to")
-	scene := flag.Int("scene", 0, "Bootstrap to scene N (0 = fresh start)")
-	latestScene := flag.Bool("latest-scene", false, "Bootstrap from the most recently saved snapshot (overrides -scene)")
-	starterItems := flag.Bool("starter-items", false, "Grant starter items to new users")
+	dbPath := flag.String("db", "db/game.db", "SQLite database path")
 	flag.Parse()
 
 	octoURL := "http://" + *host + ":" + strconv.Itoa(*httpPort)
@@ -34,18 +32,12 @@ func main() {
 
 	go startHTTP(*httpPort, resourcesBaseURL)
 
-	snapshotDir := "snapshots"
-	if err := os.MkdirAll(snapshotDir, 0755); err != nil {
-		log.Fatalf("create snapshot dir: %v", err)
+	db, err := database.Open(*dbPath)
+	if err != nil {
+		log.Fatalf("open database: %v", err)
 	}
-	if *latestScene {
-		if id, ok := memory.LatestSnapshotSceneId(snapshotDir); ok {
-			*scene = int(id)
-			log.Printf("[latest-scene] auto-selected most recent snapshot: scene=%d", id)
-		} else {
-			log.Printf("[latest-scene] no snapshots found in %q; starting fresh", snapshotDir)
-		}
-	}
+	defer db.Close()
+	log.Printf("database opened: %s", *dbPath)
 
 	gameConfig, err := masterdata.LoadGameConfig()
 	if err != nil {
@@ -65,14 +57,7 @@ func main() {
 		log.Fatalf("load quest catalog: %v", err)
 	}
 	questHandler := questflow.NewQuestHandler(questCatalog, gameConfig)
-	userStore := memory.New(gametime.Now,
-		memory.WithSnapshotDir(snapshotDir),
-		memory.WithSceneId(int32(*scene)),
-		memory.WithStarterItems(*starterItems),
-	)
-	if *scene != 0 {
-		log.Printf("bootstrap scene: %d (from snapshot)", *scene)
-	}
+	userStore := sqlite.New(db, gametime.Now)
 
 	gachaEntries, medalInfo, err := masterdata.LoadGachaCatalog()
 	if err != nil {
@@ -99,7 +84,6 @@ func main() {
 	gachaPool.BuildFeaturedMapping(gachaEntries)
 	gachaPool.BuildBannerPools(gachaEntries)
 	masterdata.EnrichCatalogPromotions(gachaEntries, gachaPool)
-	userStore.ReplaceCatalog(gachaEntries)
 
 	dupExchange, err := masterdata.LoadDupExchange()
 	if err != nil {
@@ -185,6 +169,7 @@ func main() {
 		userStore,
 		questHandler,
 		gachaHandler,
+		gachaEntries,
 		cageOrnamentCatalog,
 		loginBonusCatalog,
 		characterViewerCatalog,

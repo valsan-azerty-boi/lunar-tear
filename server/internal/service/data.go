@@ -42,12 +42,12 @@ func (s *DataServiceServer) GetUserData(ctx context.Context, req *pb.UserDataGet
 	log.Printf("[DataService] GetUserData: tables=%v", req.TableName)
 
 	userId := currentUserId(ctx, s.users, s.sessions)
-	user, err := s.users.SnapshotUser(userId)
+	user, err := s.users.LoadUser(userId)
 	if err != nil {
 		return nil, fmt.Errorf("snapshot user: %w", err)
 	}
 
-	defaults := userdata.FirstEntranceClientTableMap(user)
+	defaults := userdata.FullClientTableMap(user)
 	result := userdata.SelectTables(defaults, req.TableName)
 	return &pb.UserDataGetResponse{
 		UserDataJson: result,

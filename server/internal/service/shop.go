@@ -89,8 +89,7 @@ func (s *ShopServiceServer) Buy(ctx context.Context, req *pb.BuyRequest) (*pb.Bu
 		return nil, fmt.Errorf("shop buy: %w", err)
 	}
 
-	tables := userdata.FullClientTableMap(snapshot)
-	diff := userdata.BuildDiffFromTables(userdata.SelectTables(tables, shopDiffTables))
+	diff := userdata.BuildDiffFromTables(userdata.ProjectTables(snapshot, shopDiffTables))
 	userdata.AddWeaponStoryDiff(diff, snapshot, s.granter.DrainChangedStoryWeaponIds())
 
 	return &pb.BuyResponse{
@@ -132,8 +131,7 @@ func (s *ShopServiceServer) RefreshUserData(ctx context.Context, req *pb.Refresh
 		return nil, fmt.Errorf("shop refresh: %w", err)
 	}
 
-	tables := userdata.FullClientTableMap(snapshot)
-	diff := userdata.BuildDiffFromTables(userdata.SelectTables(tables, shopDiffTables))
+	diff := userdata.BuildDiffFromTables(userdata.ProjectTables(snapshot, shopDiffTables))
 
 	return &pb.RefreshResponse{
 		DiffUserData: diff,
@@ -195,8 +193,7 @@ func (s *ShopServiceServer) CreatePurchaseTransaction(ctx context.Context, req *
 
 	txId := fmt.Sprintf("tx_%d_%d_%d", userId, req.ShopItemId, nowMillis)
 
-	tables := userdata.FullClientTableMap(snapshot)
-	diff := userdata.BuildDiffFromTables(userdata.SelectTables(tables, shopDiffTables))
+	diff := userdata.BuildDiffFromTables(userdata.ProjectTables(snapshot, shopDiffTables))
 
 	return &pb.CreatePurchaseTransactionResponse{
 		PurchaseTransactionId: txId,
@@ -208,13 +205,12 @@ func (s *ShopServiceServer) PurchaseGooglePlayStoreProduct(ctx context.Context, 
 	log.Printf("[ShopService] PurchaseGooglePlayStoreProduct: txId=%s", req.PurchaseTransactionId)
 
 	userId := currentUserId(ctx, s.users, s.sessions)
-	snapshot, err := s.users.SnapshotUser(userId)
+	snapshot, err := s.users.LoadUser(userId)
 	if err != nil {
 		return nil, fmt.Errorf("purchase google play: %w", err)
 	}
 
-	tables := userdata.FullClientTableMap(snapshot)
-	diff := userdata.BuildDiffFromTables(userdata.SelectTables(tables, shopDiffTables))
+	diff := userdata.BuildDiffFromTables(userdata.ProjectTables(snapshot, shopDiffTables))
 
 	return &pb.PurchaseGooglePlayStoreProductResponse{
 		OverflowPossession: []*pb.Possession{},

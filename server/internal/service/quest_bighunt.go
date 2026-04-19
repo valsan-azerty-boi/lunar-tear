@@ -42,7 +42,7 @@ var bigHuntDiffTables = []string{
 }
 
 func buildBigHuntDiff(user store.UserState, tableNames []string) map[string]*pb.DiffData {
-	tables := userdata.SelectTables(userdata.FullClientTableMap(user), tableNames)
+	tables := userdata.ProjectTables(user, tableNames)
 	return userdata.BuildDiffFromTablesOrdered(tables, tableNames)
 }
 
@@ -331,7 +331,7 @@ func (s *BigHuntServiceServer) GetBigHuntTopData(ctx context.Context, _ *emptypb
 	log.Printf("[BigHuntService] GetBigHuntTopData")
 
 	userId := currentUserId(ctx, s.users, s.sessions)
-	user, _ := s.users.SnapshotUser(userId)
+	user, _ := s.users.LoadUser(userId)
 
 	nowMillis := gametime.NowMillis()
 	weeklyVersion := gametime.WeeklyVersion(nowMillis)

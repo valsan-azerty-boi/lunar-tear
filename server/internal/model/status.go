@@ -22,6 +22,14 @@ const (
 	CostumeAwakenEffectTypeItemAcquire CostumeAwakenEffectType = 3
 )
 
+type CostumeLotteryEffectType int32
+
+const (
+	CostumeLotteryEffectTypeUnknown  CostumeLotteryEffectType = 0
+	CostumeLotteryEffectTypeAbility  CostumeLotteryEffectType = 1
+	CostumeLotteryEffectTypeStatusUp CostumeLotteryEffectType = 2
+)
+
 type WeaponAwakenEffectType int32
 
 const (

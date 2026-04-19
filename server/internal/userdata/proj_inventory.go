@@ -105,12 +105,18 @@ func init() {
 		s, _ := encodeJSONMaps(SortedWeaponAwakenRecords(user)...)
 		return s
 	})
+	register("IUserCostumeLotteryEffect", func(user store.UserState) string {
+		s, _ := encodeJSONMaps(sortedCostumeLotteryEffectRecords(user)...)
+		return s
+	})
+	register("IUserCostumeLotteryEffectPending", func(user store.UserState) string {
+		s, _ := encodeJSONMaps(SortedCostumeLotteryEffectPendingRecords(user)...)
+		return s
+	})
 	registerStatic(
 		"IUserCostumeLevelBonusReleaseStatus",
-		"IUserCostumeLotteryEffect",
 		"IUserCostumeLotteryEffectAbility",
 		"IUserCostumeLotteryEffectStatusUp",
-		"IUserCostumeLotteryEffectPending",
 		"IUserPartsPresetTag",
 		"IUserPartsStatusSub",
 	)
@@ -143,16 +149,17 @@ func sortedCostumeRecords(user store.UserState) []map[string]any {
 	for _, key := range keys {
 		row := user.Costumes[key]
 		records = append(records, map[string]any{
-			"userId":              user.UserId,
-			"userCostumeUuid":     row.UserCostumeUuid,
-			"costumeId":           row.CostumeId,
-			"limitBreakCount":     row.LimitBreakCount,
-			"level":               row.Level,
-			"exp":                 row.Exp,
-			"headupDisplayViewId": row.HeadupDisplayViewId,
-			"acquisitionDatetime": row.AcquisitionDatetime,
-			"awakenCount":         row.AwakenCount,
-			"latestVersion":       row.LatestVersion,
+			"userId":                                user.UserId,
+			"userCostumeUuid":                       row.UserCostumeUuid,
+			"costumeId":                             row.CostumeId,
+			"limitBreakCount":                       row.LimitBreakCount,
+			"level":                                 row.Level,
+			"exp":                                   row.Exp,
+			"headupDisplayViewId":                   row.HeadupDisplayViewId,
+			"acquisitionDatetime":                   row.AcquisitionDatetime,
+			"awakenCount":                           row.AwakenCount,
+			"costumeLotteryEffectUnlockedSlotCount": row.CostumeLotteryEffectUnlockedSlotCount,
+			"latestVersion":                         row.LatestVersion,
 		})
 	}
 	return records
@@ -615,6 +622,47 @@ func sortedCageOrnamentRewardRecords(user store.UserState) []map[string]any {
 			"cageOrnamentId":      row.CageOrnamentId,
 			"acquisitionDatetime": row.AcquisitionDatetime,
 			"latestVersion":       row.LatestVersion,
+		})
+	}
+	return records
+}
+
+func SortedCostumeLotteryEffectPendingRecords(user store.UserState) []map[string]any {
+	keys := sortedStringKeys(user.CostumeLotteryEffectPending)
+	records := make([]map[string]any, 0, len(keys))
+	for _, key := range keys {
+		row := user.CostumeLotteryEffectPending[key]
+		records = append(records, map[string]any{
+			"userId":          user.UserId,
+			"userCostumeUuid": row.UserCostumeUuid,
+			"slotNumber":      row.SlotNumber,
+			"oddsNumber":      row.OddsNumber,
+			"latestVersion":   row.LatestVersion,
+		})
+	}
+	return records
+}
+
+func sortedCostumeLotteryEffectRecords(user store.UserState) []map[string]any {
+	keys := make([]store.CostumeLotteryEffectKey, 0, len(user.CostumeLotteryEffects))
+	for k := range user.CostumeLotteryEffects {
+		keys = append(keys, k)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		if keys[i].UserCostumeUuid != keys[j].UserCostumeUuid {
+			return keys[i].UserCostumeUuid < keys[j].UserCostumeUuid
+		}
+		return keys[i].SlotNumber < keys[j].SlotNumber
+	})
+	records := make([]map[string]any, 0, len(keys))
+	for _, k := range keys {
+		row := user.CostumeLotteryEffects[k]
+		records = append(records, map[string]any{
+			"userId":          user.UserId,
+			"userCostumeUuid": row.UserCostumeUuid,
+			"slotNumber":      row.SlotNumber,
+			"oddsNumber":      row.OddsNumber,
+			"latestVersion":   row.LatestVersion,
 		})
 	}
 	return records

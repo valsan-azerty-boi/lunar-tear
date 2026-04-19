@@ -71,7 +71,7 @@ func (s *GiftServiceServer) GetGiftList(ctx context.Context, req *pb.GetGiftList
 		req.RewardKindType, req.ExpirationType, req.IsAscendingSort, req.NextCursor, req.PreviousCursor, req.GetCount)
 
 	userId := currentUserId(ctx, s.users, s.sessions)
-	user, err := s.users.SnapshotUser(userId)
+	user, err := s.users.LoadUser(userId)
 	if err != nil {
 		return nil, fmt.Errorf("snapshot user: %w", err)
 	}
@@ -108,7 +108,7 @@ func (s *GiftServiceServer) GetGiftList(ctx context.Context, req *pb.GetGiftList
 func (s *GiftServiceServer) GetGiftReceiveHistoryList(ctx context.Context, req *emptypb.Empty) (*pb.GetGiftReceiveHistoryListResponse, error) {
 	log.Printf("[GiftService] GetGiftReceiveHistoryList")
 	userId := currentUserId(ctx, s.users, s.sessions)
-	user, err := s.users.SnapshotUser(userId)
+	user, err := s.users.LoadUser(userId)
 	if err != nil {
 		return nil, fmt.Errorf("snapshot user: %w", err)
 	}

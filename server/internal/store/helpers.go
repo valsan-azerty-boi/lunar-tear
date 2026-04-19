@@ -5,6 +5,8 @@ import (
 	"log"
 	"sort"
 
+	"github.com/google/uuid"
+
 	"lunar-tear/server/internal/gametime"
 	"lunar-tear/server/internal/model"
 )
@@ -139,7 +141,7 @@ func (g *PossessionGranter) GrantCostume(user *UserState, costumeId int32, nowMi
 			}
 		}
 	}
-	key := fmt.Sprintf("reward-costume-%d", costumeId)
+	key := uuid.New().String()
 	user.Costumes[key] = CostumeState{
 		UserCostumeUuid:     key,
 		CostumeId:           costumeId,
@@ -155,16 +157,7 @@ func (g *PossessionGranter) GrantCostume(user *UserState, costumeId int32, nowMi
 }
 
 func (g *PossessionGranter) GrantWeapon(user *UserState, weaponId int32, nowMillis int64) {
-	key := fmt.Sprintf("reward-weapon-%d-%d", weaponId, nowMillis)
-	if _, exists := user.Weapons[key]; exists {
-		for i := 2; ; i++ {
-			candidate := fmt.Sprintf("%s-%d", key, i)
-			if _, exists := user.Weapons[candidate]; !exists {
-				key = candidate
-				break
-			}
-		}
-	}
+	key := uuid.New().String()
 	user.Weapons[key] = WeaponState{
 		UserWeaponUuid:      key,
 		WeaponId:            weaponId,
@@ -269,16 +262,29 @@ func EnsureDefaultDeck(user *UserState, nowMillis int64) {
 		return
 	}
 
-	costumeUuid := FirstSortedKey(user.Costumes)
-	weaponUuid := FirstSortedKey(user.Weapons)
-	companionUuid := FirstSortedKey(user.Companions)
+	const rionCostumeId = int32(10100)
+	const rionWeaponId = int32(101001)
 
-	dcUuid := "default-deck-character-0001"
+	var costumeUuid, weaponUuid string
+	for k, v := range user.Costumes {
+		if v.CostumeId == rionCostumeId {
+			costumeUuid = k
+			break
+		}
+	}
+	for k, v := range user.Weapons {
+		if v.WeaponId == rionWeaponId {
+			weaponUuid = k
+			break
+		}
+	}
+
+	dcUuid := uuid.New().String()
 	user.DeckCharacters[dcUuid] = DeckCharacterState{
 		UserDeckCharacterUuid: dcUuid,
+		UserCompanionUuid:     "",
 		UserCostumeUuid:       costumeUuid,
 		MainUserWeaponUuid:    weaponUuid,
-		UserCompanionUuid:     companionUuid,
 		Power:                 100,
 		LatestVersion:         nowMillis,
 	}
@@ -324,14 +330,17 @@ func ApplyDeckReplacement(user *UserState, deckType model.DeckType, userDeckNumb
 		deck.Power = 100
 	}
 
-	uuids := []*string{&deck.UserDeckCharacterUuid01, &deck.UserDeckCharacterUuid02, &deck.UserDeckCharacterUuid03}
-	for i, uuid := range uuids {
+	uuidPtrs := []*string{&deck.UserDeckCharacterUuid01, &deck.UserDeckCharacterUuid02, &deck.UserDeckCharacterUuid03}
+	for i, uuidPtr := range uuidPtrs {
 		if i >= len(slots) || slots[i].UserCostumeUuid == "" {
-			*uuid = ""
+			*uuidPtr = ""
 			continue
 		}
 		slot := slots[i]
-		dcUuid := fmt.Sprintf("deck-%d-%d-%d", deckType, userDeckNumber, i+1)
+		dcUuid := *uuidPtr
+		if dcUuid == "" {
+			dcUuid = uuid.New().String()
+		}
 		dc := user.DeckCharacters[dcUuid]
 		dc.UserDeckCharacterUuid = dcUuid
 		dc.UserCostumeUuid = slot.UserCostumeUuid
@@ -343,7 +352,7 @@ func ApplyDeckReplacement(user *UserState, deckType model.DeckType, userDeckNumb
 		user.DeckCharacters[dcUuid] = dc
 		user.DeckSubWeapons[dcUuid] = slot.SubWeaponUuids
 		user.DeckParts[dcUuid] = slot.PartsUuids
-		*uuid = dcUuid
+		*uuidPtr = dcUuid
 	}
 
 	deck.LatestVersion = nowMillis

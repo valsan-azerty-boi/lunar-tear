@@ -2,9 +2,10 @@ package service
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"time"
+
+	"github.com/google/uuid"
 
 	pb "lunar-tear/server/gen/proto"
 	"lunar-tear/server/internal/gametime"
@@ -55,7 +56,7 @@ func (s *LoginBonusServiceServer) ReceiveStamp(ctx context.Context, req *emptypb
 				GrantDatetime:  now,
 			},
 			ExpirationDatetime: now + int64(30*24*time.Hour/time.Millisecond),
-			UserGiftUuid:       fmt.Sprintf("login-bonus-%d-%d", userId, nextStamp),
+			UserGiftUuid:       uuid.New().String(),
 		})
 		user.Notifications.GiftNotReceiveCount = int32(len(user.Gifts.NotReceived))
 		user.LoginBonus.CurrentStampNumber = nextStamp
@@ -63,8 +64,7 @@ func (s *LoginBonusServiceServer) ReceiveStamp(ctx context.Context, req *emptypb
 		user.LoginBonus.LatestVersion = now
 	})
 
-	diff := userdata.BuildDiffFromTables(userdata.SelectTables(
-		userdata.FullClientTableMap(user),
+	diff := userdata.BuildDiffFromTables(userdata.ProjectTables(user,
 		[]string{"IUserLoginBonus"},
 	))
 	setCommonResponseTrailers(ctx, diff, false)

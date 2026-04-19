@@ -33,7 +33,7 @@ func (s *MaterialServiceServer) Sell(ctx context.Context, req *pb.MaterialSellRe
 
 	userId := currentUserId(ctx, s.users, s.sessions)
 
-	oldUser, _ := s.users.SnapshotUser(userId)
+	oldUser, _ := s.users.LoadUser(userId)
 	tracker := userdata.NewDeleteTracker().
 		Track("IUserMaterial", oldUser, userdata.SortedMaterialRecords, []string{"userId", "materialId"})
 
@@ -71,7 +71,7 @@ func (s *MaterialServiceServer) Sell(ctx context.Context, req *pb.MaterialSellRe
 		return nil, fmt.Errorf("material sell: %w", err)
 	}
 
-	tables := userdata.SelectTables(userdata.FullClientTableMap(snapshot), materialDiffTables)
+	tables := userdata.ProjectTables(snapshot, materialDiffTables)
 	diff := tracker.Apply(snapshot, tables)
 
 	return &pb.MaterialSellResponse{

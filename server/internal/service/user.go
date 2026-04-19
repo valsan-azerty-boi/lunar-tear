@@ -50,9 +50,13 @@ func setCommonResponseTrailers(ctx context.Context, diff map[string]*pb.DiffData
 }
 
 func (s *UserServiceServer) RegisterUser(ctx context.Context, req *pb.RegisterUserRequest) (*pb.RegisterUserResponse, error) {
-	user, err := s.users.EnsureUser(req.Uuid)
+	userId, err := s.users.CreateUser(req.Uuid)
 	if err != nil {
-		return nil, fmt.Errorf("ensure user: %w", err)
+		return nil, fmt.Errorf("create user: %w", err)
+	}
+	user, err := s.users.LoadUser(userId)
+	if err != nil {
+		return nil, fmt.Errorf("load user: %w", err)
 	}
 	log.Printf("[UserService] RegisterUser: uuid=%s terminalId=%s -> userId=%d", req.Uuid, req.TerminalId, user.UserId)
 
@@ -66,9 +70,13 @@ func (s *UserServiceServer) RegisterUser(ctx context.Context, req *pb.RegisterUs
 func (s *UserServiceServer) Auth(ctx context.Context, req *pb.AuthUserRequest) (*pb.AuthUserResponse, error) {
 	log.Printf("[UserService] Auth: uuid=%s", req.Uuid)
 
-	user, session, err := s.sessions.CreateSession(req.Uuid, 24*time.Hour)
+	session, err := s.sessions.CreateSession(req.Uuid, 24*time.Hour)
 	if err != nil {
 		return nil, fmt.Errorf("create session: %w", err)
+	}
+	user, err := s.users.LoadUser(session.UserId)
+	if err != nil {
+		return nil, fmt.Errorf("load user: %w", err)
 	}
 
 	return &pb.AuthUserResponse{
@@ -84,7 +92,7 @@ func (s *UserServiceServer) GameStart(ctx context.Context, _ *emptypb.Empty) (*p
 	log.Printf("[UserService] GameStart")
 
 	if md, ok := metadata.FromIncomingContext(ctx); ok {
-		if vals := md.Get("x-session-key"); len(vals) > 0 {
+		if vals := md.Get("x-apb-session-key"); len(vals) > 0 {
 			log.Printf("[UserService] GameStart session: %s", vals[0])
 		}
 	}
@@ -93,8 +101,7 @@ func (s *UserServiceServer) GameStart(ctx context.Context, _ *emptypb.Empty) (*p
 	user, _ := s.users.UpdateUser(userId, func(user *store.UserState) {
 		user.GameStartDatetime = gametime.NowMillis()
 	})
-	fullTables := userdata.FullClientTableMap(user)
-	diff := userdata.BuildDiffFromTables(userdata.SelectTables(fullTables, startedGameStartTables))
+	diff := userdata.BuildDiffFromTables(userdata.ProjectTables(user, startedGameStartTables))
 	setCommonResponseTrailers(ctx, diff, true)
 
 	return &pb.GameStartResponse{
@@ -106,12 +113,12 @@ func (s *UserServiceServer) GameStart(ctx context.Context, _ *emptypb.Empty) (*p
 
 func (s *UserServiceServer) TransferUser(ctx context.Context, req *pb.TransferUserRequest) (*pb.TransferUserResponse, error) {
 	log.Printf("[UserService] TransferUser")
-	user, err := s.users.EnsureUser(req.Uuid)
+	userId, err := s.users.CreateUser(req.Uuid)
 	if err != nil {
-		return nil, fmt.Errorf("ensure user: %w", err)
+		return nil, fmt.Errorf("create user: %w", err)
 	}
 	return &pb.TransferUserResponse{
-		UserId:       user.UserId,
+		UserId:       userId,
 		Signature:    "transferred-sig",
 		DiffUserData: userdata.EmptyDiff(),
 	}, nil
@@ -126,7 +133,7 @@ func (s *UserServiceServer) SetUserName(ctx context.Context, req *pb.SetUserName
 		user.Profile.NameUpdateDatetime = nowMillis
 	})
 	return &pb.SetUserNameResponse{
-		DiffUserData: userdata.BuildDiffFromTables(userdata.SelectTables(userdata.FullClientTableMap(user), []string{"IUserProfile"})),
+		DiffUserData: userdata.BuildDiffFromTables(userdata.ProjectTables(user, []string{"IUserProfile"})),
 	}, nil
 }
 
@@ -139,7 +146,7 @@ func (s *UserServiceServer) SetUserMessage(ctx context.Context, req *pb.SetUserM
 		user.Profile.MessageUpdateDatetime = nowMillis
 	})
 	return &pb.SetUserMessageResponse{
-		DiffUserData: userdata.BuildDiffFromTables(userdata.SelectTables(userdata.FullClientTableMap(user), []string{"IUserProfile"})),
+		DiffUserData: userdata.BuildDiffFromTables(userdata.ProjectTables(user, []string{"IUserProfile"})),
 	}, nil
 }
 
@@ -152,7 +159,7 @@ func (s *UserServiceServer) SetUserFavoriteCostumeId(ctx context.Context, req *p
 		user.Profile.FavoriteCostumeIdUpdateDatetime = nowMillis
 	})
 	return &pb.SetUserFavoriteCostumeIdResponse{
-		DiffUserData: userdata.BuildDiffFromTables(userdata.SelectTables(userdata.FullClientTableMap(user), []string{"IUserProfile"})),
+		DiffUserData: userdata.BuildDiffFromTables(userdata.ProjectTables(user, []string{"IUserProfile"})),
 	}, nil
 }
 
@@ -162,7 +169,7 @@ func (s *UserServiceServer) GetUserProfile(ctx context.Context, req *pb.GetUserP
 	if userId == 0 {
 		userId = currentUserId(ctx, s.users, s.sessions)
 	}
-	user, err := s.users.SnapshotUser(userId)
+	user, err := s.users.LoadUser(userId)
 	if err != nil {
 		return &pb.GetUserProfileResponse{DiffUserData: userdata.EmptyDiff()}, nil
 	}
@@ -219,7 +226,7 @@ func (s *UserServiceServer) SetBirthYearMonth(ctx context.Context, req *pb.SetBi
 
 func (s *UserServiceServer) GetBirthYearMonth(ctx context.Context, _ *emptypb.Empty) (*pb.GetBirthYearMonthResponse, error) {
 	userId := currentUserId(ctx, s.users, s.sessions)
-	user, err := s.users.SnapshotUser(userId)
+	user, err := s.users.LoadUser(userId)
 	if err != nil {
 		return &pb.GetBirthYearMonthResponse{BirthYear: 2000, BirthMonth: 1, DiffUserData: userdata.EmptyDiff()}, nil
 	}
@@ -228,7 +235,7 @@ func (s *UserServiceServer) GetBirthYearMonth(ctx context.Context, _ *emptypb.Em
 
 func (s *UserServiceServer) GetChargeMoney(ctx context.Context, _ *emptypb.Empty) (*pb.GetChargeMoneyResponse, error) {
 	userId := currentUserId(ctx, s.users, s.sessions)
-	user, err := s.users.SnapshotUser(userId)
+	user, err := s.users.LoadUser(userId)
 	if err != nil {
 		return &pb.GetChargeMoneyResponse{ChargeMoneyThisMonth: 0, DiffUserData: userdata.EmptyDiff()}, nil
 	}
@@ -242,7 +249,7 @@ func (s *UserServiceServer) SetUserSetting(ctx context.Context, req *pb.SetUserS
 		user.Setting.IsNotifyPurchaseAlert = req.IsNotifyPurchaseAlert
 	})
 	return &pb.SetUserSettingResponse{
-		DiffUserData: userdata.BuildDiffFromTables(userdata.SelectTables(userdata.FullClientTableMap(user), []string{"IUserSetting"})),
+		DiffUserData: userdata.BuildDiffFromTables(userdata.ProjectTables(user, []string{"IUserSetting"})),
 	}, nil
 }
 
@@ -252,7 +259,7 @@ func (s *UserServiceServer) GetAndroidArgs(ctx context.Context, req *pb.GetAndro
 
 func (s *UserServiceServer) GetBackupToken(ctx context.Context, req *pb.GetBackupTokenRequest) (*pb.GetBackupTokenResponse, error) {
 	userId := currentUserId(ctx, s.users, s.sessions)
-	user, err := s.users.SnapshotUser(userId)
+	user, err := s.users.LoadUser(userId)
 	if err != nil {
 		return &pb.GetBackupTokenResponse{BackupToken: "mock-backup-token", DiffUserData: userdata.EmptyDiff()}, nil
 	}

@@ -38,7 +38,7 @@ func (s *GimmickServiceServer) UpdateSequence(ctx context.Context, req *pb.Updat
 		user.Gimmick.Sequences[key] = sequence
 	})
 	return &pb.UpdateSequenceResponse{
-		DiffUserData: userdata.BuildDiffFromTables(userdata.SelectTables(userdata.FullClientTableMap(user), []string{"IUserGimmickSequence"})),
+		DiffUserData: userdata.BuildDiffFromTables(userdata.ProjectTables(user, []string{"IUserGimmickSequence"})),
 	}, nil
 }
 
@@ -74,7 +74,7 @@ func (s *GimmickServiceServer) UpdateGimmickProgress(ctx context.Context, req *p
 		GimmickOrnamentReward:      []*pb.GimmickReward{},
 		IsSequenceCleared:          false,
 		GimmickSequenceClearReward: []*pb.GimmickReward{},
-		DiffUserData: userdata.BuildDiffFromTables(userdata.SelectTables(userdata.FullClientTableMap(user), []string{
+		DiffUserData: userdata.BuildDiffFromTables(userdata.ProjectTables(user, []string{
 			"IUserGimmick",
 			"IUserGimmickOrnamentProgress",
 		})),
@@ -98,7 +98,7 @@ func (s *GimmickServiceServer) InitSequenceSchedule(ctx context.Context, _ *empt
 		}
 	})
 	return &pb.InitSequenceScheduleResponse{
-		DiffUserData: userdata.BuildDiffFromTables(userdata.SelectTables(userdata.FullClientTableMap(user), gimmickDiffTables)),
+		DiffUserData: userdata.BuildDiffFromTables(userdata.ProjectTables(user, gimmickDiffTables)),
 	}, nil
 }
 
@@ -119,6 +119,6 @@ func (s *GimmickServiceServer) Unlock(ctx context.Context, req *pb.UnlockRequest
 		}
 	})
 	return &pb.UnlockResponse{
-		DiffUserData: userdata.BuildDiffFromTables(userdata.SelectTables(userdata.FullClientTableMap(user), []string{"IUserGimmickUnlock"})),
+		DiffUserData: userdata.BuildDiffFromTables(userdata.ProjectTables(user, []string{"IUserGimmickUnlock"})),
 	}, nil
 }

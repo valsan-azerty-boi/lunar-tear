@@ -77,8 +77,7 @@ func (s *CompanionServiceServer) Enhance(ctx context.Context, req *pb.CompanionE
 		return nil, fmt.Errorf("companion enhance: %w", err)
 	}
 
-	tables := userdata.FullClientTableMap(snapshot)
-	diff := userdata.BuildDiffFromTables(userdata.SelectTables(tables, companionDiffTables))
+	diff := userdata.BuildDiffFromTables(userdata.ProjectTables(snapshot, companionDiffTables))
 
 	return &pb.CompanionEnhanceResponse{
 		DiffUserData: diff,

@@ -138,6 +138,14 @@ func SelectTables(all map[string]string, requested []string) map[string]string {
 	return selected
 }
 
+func ProjectTables(user store.UserState, requested []string) map[string]string {
+	result := make(map[string]string, len(requested))
+	for _, table := range requested {
+		result[table] = projectTable(table, user)
+	}
+	return result
+}
+
 func BuildDiffFromTables(tables map[string]string) map[string]*pb.DiffData {
 	diff := make(map[string]*pb.DiffData, len(tables))
 	for table, payload := range tables {

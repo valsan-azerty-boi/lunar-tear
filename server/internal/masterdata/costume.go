@@ -78,6 +78,31 @@ type CostumeActiveSkillEnhanceMaterialRow struct {
 	SortOrder                               int32 `json:"SortOrder"`
 }
 
+type CostumeLotteryEffectRow struct {
+	CostumeId                                 int32 `json:"CostumeId"`
+	SlotNumber                                int32 `json:"SlotNumber"`
+	CostumeLotteryEffectOddsGroupId           int32 `json:"CostumeLotteryEffectOddsGroupId"`
+	CostumeLotteryEffectUnlockMaterialGroupId int32 `json:"CostumeLotteryEffectUnlockMaterialGroupId"`
+	CostumeLotteryEffectDrawMaterialGroupId   int32 `json:"CostumeLotteryEffectDrawMaterialGroupId"`
+	CostumeLotteryEffectReleaseScheduleId     int32 `json:"CostumeLotteryEffectReleaseScheduleId"`
+}
+
+type CostumeLotteryEffectMaterialGroupRow struct {
+	CostumeLotteryEffectMaterialGroupId int32 `json:"CostumeLotteryEffectMaterialGroupId"`
+	MaterialId                          int32 `json:"MaterialId"`
+	Count                               int32 `json:"Count"`
+	SortOrder                           int32 `json:"SortOrder"`
+}
+
+type CostumeLotteryEffectOddsRow struct {
+	CostumeLotteryEffectOddsGroupId int32 `json:"CostumeLotteryEffectOddsGroupId"`
+	OddsNumber                      int32 `json:"OddsNumber"`
+	Weight                          int32 `json:"Weight"`
+	CostumeLotteryEffectType        int32 `json:"CostumeLotteryEffectType"`
+	CostumeLotteryEffectTargetId    int32 `json:"CostumeLotteryEffectTargetId"`
+	RarityType                      int32 `json:"RarityType"`
+}
+
 type CostumeCatalog struct {
 	Costumes               map[int32]CostumeMasterRow
 	Materials              map[int32]MaterialRow
@@ -96,6 +121,10 @@ type CostumeCatalog struct {
 	ActiveSkillEnhanceMats      map[[2]int32][]CostumeActiveSkillEnhanceMaterialRow // key: [enhancementMaterialId, skillLevel]
 	ActiveSkillMaxLevelByRarity map[int32]NumericalFunc
 	ActiveSkillCostByRarity     map[int32]NumericalFunc
+
+	LotteryEffects    map[[2]int32]CostumeLotteryEffectRow             // key: [costumeId, slotNumber]
+	LotteryEffectMats map[int32][]CostumeLotteryEffectMaterialGroupRow // key: materialGroupId (both unlock and draw)
+	LotteryEffectOdds map[int32][]CostumeLotteryEffectOddsRow          // key: oddsGroupId
 }
 
 func LoadCostumeCatalog(matCatalog *MaterialCatalog) (*CostumeCatalog, error) {
@@ -149,6 +178,19 @@ func LoadCostumeCatalog(matCatalog *MaterialCatalog) (*CostumeCatalog, error) {
 		return nil, fmt.Errorf("load costume active skill enhancement material table: %w", err)
 	}
 
+	lotteryEffectRows, err := utils.ReadJSON[CostumeLotteryEffectRow]("EntityMCostumeLotteryEffectTable.json")
+	if err != nil {
+		return nil, fmt.Errorf("load costume lottery effect table: %w", err)
+	}
+	lotteryEffectMatRows, err := utils.ReadJSON[CostumeLotteryEffectMaterialGroupRow]("EntityMCostumeLotteryEffectMaterialGroupTable.json")
+	if err != nil {
+		return nil, fmt.Errorf("load costume lottery effect material group table: %w", err)
+	}
+	lotteryEffectOddsRows, err := utils.ReadJSON[CostumeLotteryEffectOddsRow]("EntityMCostumeLotteryEffectOddsGroupTable.json")
+	if err != nil {
+		return nil, fmt.Errorf("load costume lottery effect odds group table: %w", err)
+	}
+
 	catalog := &CostumeCatalog{
 		Costumes:               make(map[int32]CostumeMasterRow, len(costumes)),
 		Materials:              matCatalog.ByType[model.MaterialTypeCostumeEnhancement],
@@ -167,6 +209,10 @@ func LoadCostumeCatalog(matCatalog *MaterialCatalog) (*CostumeCatalog, error) {
 		ActiveSkillEnhanceMats:      make(map[[2]int32][]CostumeActiveSkillEnhanceMaterialRow),
 		ActiveSkillMaxLevelByRarity: make(map[int32]NumericalFunc, len(rarities)),
 		ActiveSkillCostByRarity:     make(map[int32]NumericalFunc, len(rarities)),
+
+		LotteryEffects:    make(map[[2]int32]CostumeLotteryEffectRow, len(lotteryEffectRows)),
+		LotteryEffectMats: make(map[int32][]CostumeLotteryEffectMaterialGroupRow),
+		LotteryEffectOdds: make(map[int32][]CostumeLotteryEffectOddsRow),
 	}
 
 	for _, row := range costumes {
@@ -240,6 +286,19 @@ func LoadCostumeCatalog(matCatalog *MaterialCatalog) (*CostumeCatalog, error) {
 	for _, row := range activeSkillMatRows {
 		key := [2]int32{row.CostumeActiveSkillEnhancementMaterialId, row.SkillLevel}
 		catalog.ActiveSkillEnhanceMats[key] = append(catalog.ActiveSkillEnhanceMats[key], row)
+	}
+
+	for _, row := range lotteryEffectRows {
+		key := [2]int32{row.CostumeId, row.SlotNumber}
+		catalog.LotteryEffects[key] = row
+	}
+	for _, row := range lotteryEffectMatRows {
+		gid := row.CostumeLotteryEffectMaterialGroupId
+		catalog.LotteryEffectMats[gid] = append(catalog.LotteryEffectMats[gid], row)
+	}
+	for _, row := range lotteryEffectOddsRows {
+		gid := row.CostumeLotteryEffectOddsGroupId
+		catalog.LotteryEffectOdds[gid] = append(catalog.LotteryEffectOdds[gid], row)
 	}
 
 	return catalog, nil

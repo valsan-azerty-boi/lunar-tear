@@ -29,7 +29,7 @@ func NewQuestServiceServer(users store.UserRepository, sessions store.SessionRep
 }
 
 func buildSelectedQuestDiff(user store.UserState, tableNames []string) map[string]*pb.DiffData {
-	tables := userdata.SelectTables(userdata.FullClientTableMap(user), tableNames)
+	tables := userdata.ProjectTables(user, tableNames)
 	return userdata.BuildDiffFromTablesOrdered(tables, tableNames)
 }
 

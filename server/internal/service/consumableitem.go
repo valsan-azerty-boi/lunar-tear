@@ -28,7 +28,7 @@ func (s *ConsumableItemServiceServer) Sell(ctx context.Context, req *pb.Consumab
 
 	userId := currentUserId(ctx, s.users, s.sessions)
 
-	oldUser, _ := s.users.SnapshotUser(userId)
+	oldUser, _ := s.users.LoadUser(userId)
 	tracker := userdata.NewDeleteTracker().
 		Track("IUserConsumableItem", oldUser, userdata.SortedConsumableItemRecords, []string{"userId", "consumableItemId"})
 
@@ -66,7 +66,7 @@ func (s *ConsumableItemServiceServer) Sell(ctx context.Context, req *pb.Consumab
 		return nil, fmt.Errorf("consumable item sell: %w", err)
 	}
 
-	tables := userdata.SelectTables(userdata.FullClientTableMap(snapshot), []string{"IUserConsumableItem"})
+	tables := userdata.ProjectTables(snapshot, []string{"IUserConsumableItem"})
 	diff := tracker.Apply(snapshot, tables)
 
 	return &pb.ConsumableItemSellResponse{

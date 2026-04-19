@@ -33,8 +33,7 @@ func (s *DokanServiceServer) RegisterDokanConfirmed(ctx context.Context, req *pb
 		return nil, fmt.Errorf("update user: %w", err)
 	}
 
-	tables := userdata.FullClientTableMap(snapshot)
-	diff := userdata.BuildDiffFromTables(userdata.SelectTables(tables, []string{"IUserDokan"}))
+	diff := userdata.BuildDiffFromTables(userdata.ProjectTables(snapshot, []string{"IUserDokan"}))
 
 	return &pb.RegisterDokanConfirmedResponse{
 		DiffUserData: diff,

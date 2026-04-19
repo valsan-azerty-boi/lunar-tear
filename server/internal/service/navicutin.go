@@ -31,8 +31,7 @@ func (s *NaviCutInServiceServer) RegisterPlayed(ctx context.Context, req *pb.Reg
 		return nil, fmt.Errorf("update user: %w", err)
 	}
 
-	tables := userdata.FullClientTableMap(snapshot)
-	diff := userdata.BuildDiffFromTables(userdata.SelectTables(tables, []string{"IUserNaviCutIn"}))
+	diff := userdata.BuildDiffFromTables(userdata.ProjectTables(snapshot, []string{"IUserNaviCutIn"}))
 
 	return &pb.RegisterPlayedResponse{
 		DiffUserData: diff,

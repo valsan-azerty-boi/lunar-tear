@@ -24,7 +24,7 @@ func NewNotificationServiceServer(users store.UserRepository, sessions store.Ses
 func (s *NotificationServiceServer) GetHeaderNotification(ctx context.Context, req *emptypb.Empty) (*pb.GetHeaderNotificationResponse, error) {
 	log.Printf("[NotificationService] GetHeaderNotification")
 	userId := currentUserId(ctx, s.users, s.sessions)
-	user, err := s.users.SnapshotUser(userId)
+	user, err := s.users.LoadUser(userId)
 	if err != nil {
 		return &pb.GetHeaderNotificationResponse{
 			GiftNotReceiveCount:       0,

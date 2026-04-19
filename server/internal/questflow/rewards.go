@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/google/uuid"
+
 	"lunar-tear/server/internal/gameutil"
 	"lunar-tear/server/internal/masterdata"
 	"lunar-tear/server/internal/model"
@@ -276,7 +278,7 @@ func (h *QuestHandler) grantCompanion(user *store.UserState, companionId int32, 
 			return
 		}
 	}
-	key := fmt.Sprintf("reward-companion-%d", companionId)
+	key := uuid.New().String()
 	user.Companions[key] = store.CompanionState{
 		UserCompanionUuid:   key,
 		CompanionId:         companionId,
@@ -306,7 +308,7 @@ func (h *QuestHandler) grantParts(user *store.UserState, partsId int32, nowMilli
 		}
 	}
 
-	key := fmt.Sprintf("reward-parts-%d", partsId)
+	key := uuid.New().String()
 	user.Parts[key] = store.PartsState{
 		UserPartsUuid:       key,
 		PartsId:             partsId,

@@ -36,8 +36,7 @@ func (s *OmikujiServiceServer) OmikujiDraw(ctx context.Context, req *pb.OmikujiD
 		return nil, fmt.Errorf("update user: %w", err)
 	}
 
-	tables := userdata.FullClientTableMap(snapshot)
-	diff := userdata.BuildDiffFromTables(userdata.SelectTables(tables, []string{"IUserOmikuji"}))
+	diff := userdata.BuildDiffFromTables(userdata.ProjectTables(snapshot, []string{"IUserOmikuji"}))
 
 	return &pb.OmikujiDrawResponse{
 		OmikujiResultAssetId: s.catalog.LookupAssetId(req.OmikujiId),

@@ -107,9 +107,11 @@ type UserState struct {
 	CharacterBoardAbilities map[CharacterBoardAbilityKey]CharacterBoardAbilityState
 	CharacterBoardStatusUps map[CharacterBoardStatusUpKey]CharacterBoardStatusUpState
 
-	CostumeAwakenStatusUps map[CostumeAwakenStatusKey]CostumeAwakenStatusUpState
-	AutoSaleSettings       map[int32]AutoSaleSettingState
-	CharacterRebirths      map[int32]CharacterRebirthState
+	CostumeAwakenStatusUps      map[CostumeAwakenStatusKey]CostumeAwakenStatusUpState
+	CostumeLotteryEffects       map[CostumeLotteryEffectKey]CostumeLotteryEffectState
+	CostumeLotteryEffectPending map[string]CostumeLotteryEffectPendingState // key: userCostumeUuid
+	AutoSaleSettings            map[int32]AutoSaleSettingState
+	CharacterRebirths           map[int32]CharacterRebirthState
 }
 
 func (u *UserState) EnsureMaps() {
@@ -254,6 +256,12 @@ func (u *UserState) EnsureMaps() {
 	if u.CostumeAwakenStatusUps == nil {
 		u.CostumeAwakenStatusUps = make(map[CostumeAwakenStatusKey]CostumeAwakenStatusUpState)
 	}
+	if u.CostumeLotteryEffects == nil {
+		u.CostumeLotteryEffects = make(map[CostumeLotteryEffectKey]CostumeLotteryEffectState)
+	}
+	if u.CostumeLotteryEffectPending == nil {
+		u.CostumeLotteryEffectPending = make(map[string]CostumeLotteryEffectPendingState)
+	}
 	if u.AutoSaleSettings == nil {
 		u.AutoSaleSettings = make(map[int32]AutoSaleSettingState)
 	}
@@ -358,15 +366,16 @@ type CharacterState struct {
 }
 
 type CostumeState struct {
-	UserCostumeUuid     string
-	CostumeId           int32
-	LimitBreakCount     int32
-	Level               int32
-	Exp                 int32
-	HeadupDisplayViewId int32
-	AcquisitionDatetime int64
-	AwakenCount         int32
-	LatestVersion       int64
+	UserCostumeUuid                       string
+	CostumeId                             int32
+	LimitBreakCount                       int32
+	Level                                 int32
+	Exp                                   int32
+	HeadupDisplayViewId                   int32
+	AcquisitionDatetime                   int64
+	AwakenCount                           int32
+	CostumeLotteryEffectUnlockedSlotCount int32
+	LatestVersion                         int64
 }
 
 type WeaponState struct {
@@ -1069,4 +1078,42 @@ type CharacterRebirthState struct {
 	CharacterId   int32
 	RebirthCount  int32
 	LatestVersion int64
+}
+
+type CostumeLotteryEffectKey struct {
+	UserCostumeUuid string
+	SlotNumber      int32
+}
+
+func (k CostumeLotteryEffectKey) MarshalText() ([]byte, error) {
+	return fmt.Appendf(nil, "%s:%d", k.UserCostumeUuid, k.SlotNumber), nil
+}
+
+func (k *CostumeLotteryEffectKey) UnmarshalText(text []byte) error {
+	s := string(text)
+	idx := strings.LastIndex(s, ":")
+	if idx < 0 {
+		return fmt.Errorf("invalid CostumeLotteryEffectKey: %s", text)
+	}
+	k.UserCostumeUuid = s[:idx]
+	v, err := strconv.ParseInt(s[idx+1:], 10, 32)
+	if err != nil {
+		return err
+	}
+	k.SlotNumber = int32(v)
+	return nil
+}
+
+type CostumeLotteryEffectState struct {
+	UserCostumeUuid string
+	SlotNumber      int32
+	OddsNumber      int32
+	LatestVersion   int64
+}
+
+type CostumeLotteryEffectPendingState struct {
+	UserCostumeUuid string
+	SlotNumber      int32
+	OddsNumber      int32
+	LatestVersion   int64
 }

@@ -7,8 +7,13 @@ Discord server: https://discord.gg/MZAf5aVkJG
 
 ### Prerequisites
 
-- Go 1.24+
+- Go 1.25+
+- [goose](https://github.com/pressly/goose) migration tool
 - Populated `server/assets/` directory
+
+```bash
+go install github.com/pressly/goose/v3/cmd/goose@latest
+```
 
 ### Regenerate protobuf stubs
 
@@ -17,14 +22,54 @@ cd server
 make proto
 ```
 
+### Database
+
+Player state is stored in a SQLite database. Run migrations before starting the server:
+
+```bash
+cd server
+make migrate
+```
+
+Or manually:
+
+```bash
+cd server
+mkdir -p db
+goose -dir migrations sqlite3 db/game.db up
+```
+
+### Importing a Snapshot
+
+To import a JSON snapshot into the database, use the import tool. The `--uuid` flag must match the UUID your game client sends during authentication:
+
+```bash
+cd server
+make import SNAPSHOT=snapshots/scene_1.json UUID=<your-client-uuid>
+```
+
+Or directly:
+
+```bash
+go run ./cmd/import-snapshot \
+  --snapshot snapshots/scene_1.json \
+  --uuid <your-client-uuid> \
+  --db db/game.db
+```
+
+| Flag         | Default      | Description                                   |
+| ------------ | ------------ | --------------------------------------------- |
+| `--snapshot` | *(required)* | Path to JSON snapshot file                     |
+| `--uuid`     | *(required)* | UUID to assign (must match the client's UUID)  |
+| `--db`       | `db/game.db` | SQLite database path                           |
+
 ### Run
 
 ```bash
 cd server
 sudo go run ./cmd/lunar-tear \
   --host 10.0.2.2 \
-  --http-port 8080 \
-  --scene 13
+  --http-port 8080
 ```
 
 `sudo` is needed because gRPC binds to port 443 (privileged). On Linux you can use `setcap` instead:
@@ -32,7 +77,7 @@ sudo go run ./cmd/lunar-tear \
 ```bash
 go build -o lunar-tear ./cmd/lunar-tear
 sudo setcap cap_net_bind_service=+ep ./lunar-tear
-./lunar-tear --host 10.0.2.2 --http-port 8080 --scene 13
+./lunar-tear --host 10.0.2.2 --http-port 8080
 ```
 
 ### Ports
@@ -44,11 +89,34 @@ sudo setcap cap_net_bind_service=+ep ./lunar-tear
 
 ### Flags
 
-| Flag                   | Default             | Description                                              |
-| ---------------------- | ------------------- | -------------------------------------------------------- |
-| `--host`               | `127.0.0.1`         | hostname/IP given to the client                          |
-| `--http-port`          | `8080`              | HTTP/Octo server port                                    |
-| `--scene`              | `0`                 | bootstrap new users to scene N (0 = fresh start)         |
+| Flag          | Default      | Description                     |
+| ------------- | ------------ | ------------------------------- |
+| `--host`      | `127.0.0.1`  | hostname/IP given to the client |
+| `--http-port` | `8080`       | HTTP/Octo server port           |
+| `--db`        | `db/game.db` | SQLite database path            |
+
+### Docker
+
+Migrations run automatically on container start.
+
+```bash
+cd server
+docker compose up -d
+```
+
+The `db/` directory is mounted as a volume so the database persists across restarts. Make sure `assets/` is populated before starting.
+
+### Makefile Targets
+
+All targets run from the `server/` directory.
+
+| Target         | Description                                             |
+| -------------- | ------------------------------------------------------- |
+| `make proto`   | Regenerate protobuf stubs                               |
+| `make build`   | Build the server binary                                 |
+| `make build-import` | Build the import-snapshot tool                     |
+| `make migrate` | Run goose migrations on `db/game.db`                    |
+| `make import`  | Import a snapshot (`SNAPSHOT=... UUID=...` required)     |
 
 ## ⚠️ Legal Disclaimer
 

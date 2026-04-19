@@ -5,6 +5,7 @@
 server/bin/
 server/tmp/
 server/lunar-tear
+server/import-snapshot
 
 __pycache__/
 
@@ -13,12 +14,9 @@ node_modules/
 
 # Go
 server/vendor/
-
-# Certs (regenerate per-environment)
 server/certs/
-
-# Server assets (binary data, too large for git)
 server/assets/
+db/
 
 # Snapshots (recorded user state)
 snapshots/

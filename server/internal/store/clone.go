@@ -1,12 +1,8 @@
-package memory
+package store
 
-import (
-	"maps"
+import "maps"
 
-	"lunar-tear/server/internal/store"
-)
-
-func cloneUserState(u store.UserState) store.UserState {
+func CloneUserState(u UserState) UserState {
 	out := u
 	out.Tutorials = maps.Clone(u.Tutorials)
 	out.Characters = maps.Clone(u.Characters)
@@ -15,14 +11,14 @@ func cloneUserState(u store.UserState) store.UserState {
 	out.Companions = maps.Clone(u.Companions)
 	out.Thoughts = maps.Clone(u.Thoughts)
 	out.DeckCharacters = maps.Clone(u.DeckCharacters)
-	out.DeckSubWeapons = maps.Clone(u.DeckSubWeapons)
+	out.DeckSubWeapons = cloneSliceMap(u.DeckSubWeapons)
 	out.DeckParts = cloneSliceMap(u.DeckParts)
 	out.Decks = maps.Clone(u.Decks)
 	out.Quests = maps.Clone(u.Quests)
 	out.QuestMissions = maps.Clone(u.QuestMissions)
 	out.WeaponStories = maps.Clone(u.WeaponStories)
 	out.Missions = maps.Clone(u.Missions)
-	out.Gimmick = store.GimmickState{
+	out.Gimmick = GimmickState{
 		Progress:         maps.Clone(u.Gimmick.Progress),
 		OrnamentProgress: maps.Clone(u.Gimmick.OrnamentProgress),
 		Sequences:        maps.Clone(u.Gimmick.Sequences),
@@ -38,6 +34,7 @@ func cloneUserState(u store.UserState) store.UserState {
 	out.CostumeActiveSkills = maps.Clone(u.CostumeActiveSkills)
 	out.WeaponSkills = cloneSliceMap(u.WeaponSkills)
 	out.WeaponAbilities = cloneSliceMap(u.WeaponAbilities)
+	out.WeaponAwakens = maps.Clone(u.WeaponAwakens)
 	out.DeckTypeNotes = maps.Clone(u.DeckTypeNotes)
 	out.WeaponNotes = maps.Clone(u.WeaponNotes)
 	out.NaviCutInPlayed = maps.Clone(u.NaviCutInPlayed)
@@ -50,40 +47,46 @@ func cloneUserState(u store.UserState) store.UserState {
 	out.ShopReplaceableLineup = maps.Clone(u.ShopReplaceableLineup)
 	out.Explore = u.Explore
 	out.ExploreScores = maps.Clone(u.ExploreScores)
-	out.Gacha = store.GachaState{
+	out.Gacha = GachaState{
 		RewardAvailable:        u.Gacha.RewardAvailable,
 		TodaysCurrentDrawCount: u.Gacha.TodaysCurrentDrawCount,
 		DailyMaxCount:          u.Gacha.DailyMaxCount,
 		LastRewardDrawDate:     u.Gacha.LastRewardDrawDate,
-		ConvertedGachaMedal: store.ConvertedGachaMedalState{
-			ConvertedMedalPossession: append([]store.ConsumableItemState(nil), u.Gacha.ConvertedGachaMedal.ConvertedMedalPossession...),
+		ConvertedGachaMedal: ConvertedGachaMedalState{
+			ConvertedMedalPossession: append([]ConsumableItemState(nil), u.Gacha.ConvertedGachaMedal.ConvertedMedalPossession...),
 			ObtainPossession:         cloneConsumableItemPtr(u.Gacha.ConvertedGachaMedal.ObtainPossession),
 		},
 		BannerStates: cloneBannerStates(u.Gacha.BannerStates),
 	}
-	out.Gifts = store.GiftState{
+	out.Gifts = GiftState{
 		NotReceived: cloneNotReceivedGifts(u.Gifts.NotReceived),
 		Received:    cloneReceivedGifts(u.Gifts.Received),
 	}
 	out.Battle = u.Battle
+	out.SideStoryQuests = maps.Clone(u.SideStoryQuests)
+	out.QuestLimitContentStatus = maps.Clone(u.QuestLimitContentStatus)
+	out.BigHuntMaxScores = maps.Clone(u.BigHuntMaxScores)
+	out.BigHuntStatuses = maps.Clone(u.BigHuntStatuses)
+	out.BigHuntScheduleMaxScores = maps.Clone(u.BigHuntScheduleMaxScores)
+	out.BigHuntWeeklyMaxScores = maps.Clone(u.BigHuntWeeklyMaxScores)
+	out.BigHuntWeeklyStatuses = maps.Clone(u.BigHuntWeeklyStatuses)
+	out.BigHuntBattleBinary = append([]byte(nil), u.BigHuntBattleBinary...)
+	out.CharacterBoards = maps.Clone(u.CharacterBoards)
+	out.CharacterBoardAbilities = maps.Clone(u.CharacterBoardAbilities)
+	out.CharacterBoardStatusUps = maps.Clone(u.CharacterBoardStatusUps)
 	out.CostumeAwakenStatusUps = maps.Clone(u.CostumeAwakenStatusUps)
+	out.CostumeLotteryEffects = maps.Clone(u.CostumeLotteryEffects)
+	out.CostumeLotteryEffectPending = maps.Clone(u.CostumeLotteryEffectPending)
 	out.AutoSaleSettings = maps.Clone(u.AutoSaleSettings)
 	out.CharacterRebirths = maps.Clone(u.CharacterRebirths)
 	return out
 }
 
-func cloneGachaCatalogEntry(entry store.GachaCatalogEntry) store.GachaCatalogEntry {
-	out := entry
-	out.PricePhases = append([]store.GachaPricePhaseEntry(nil), entry.PricePhases...)
-	out.PromotionItems = append([]store.GachaPromotionItem(nil), entry.PromotionItems...)
-	return out
-}
-
-func cloneBannerStates(m map[int32]store.GachaBannerState) map[int32]store.GachaBannerState {
+func cloneBannerStates(m map[int32]GachaBannerState) map[int32]GachaBannerState {
 	if m == nil {
 		return nil
 	}
-	out := make(map[int32]store.GachaBannerState, len(m))
+	out := make(map[int32]GachaBannerState, len(m))
 	for k, v := range m {
 		bs := v
 		bs.BoxDrewCounts = maps.Clone(v.BoxDrewCounts)
@@ -92,7 +95,7 @@ func cloneBannerStates(m map[int32]store.GachaBannerState) map[int32]store.Gacha
 	return out
 }
 
-func cloneConsumableItemPtr(item *store.ConsumableItemState) *store.ConsumableItemState {
+func cloneConsumableItemPtr(item *ConsumableItemState) *ConsumableItemState {
 	if item == nil {
 		return nil
 	}
@@ -100,11 +103,11 @@ func cloneConsumableItemPtr(item *store.ConsumableItemState) *store.ConsumableIt
 	return &out
 }
 
-func cloneNotReceivedGifts(gifts []store.NotReceivedGiftState) []store.NotReceivedGiftState {
-	out := make([]store.NotReceivedGiftState, len(gifts))
+func cloneNotReceivedGifts(gifts []NotReceivedGiftState) []NotReceivedGiftState {
+	out := make([]NotReceivedGiftState, len(gifts))
 	for i, gift := range gifts {
-		out[i] = store.NotReceivedGiftState{
-			GiftCommon: store.GiftCommonState{
+		out[i] = NotReceivedGiftState{
+			GiftCommon: GiftCommonState{
 				PossessionType:        gift.GiftCommon.PossessionType,
 				PossessionId:          gift.GiftCommon.PossessionId,
 				Count:                 gift.GiftCommon.Count,
@@ -119,22 +122,11 @@ func cloneNotReceivedGifts(gifts []store.NotReceivedGiftState) []store.NotReceiv
 	return out
 }
 
-func cloneSliceMap[T any](m map[string][]T) map[string][]T {
-	if m == nil {
-		return nil
-	}
-	out := make(map[string][]T, len(m))
-	for k, v := range m {
-		out[k] = append([]T(nil), v...)
-	}
-	return out
-}
-
-func cloneReceivedGifts(gifts []store.ReceivedGiftState) []store.ReceivedGiftState {
-	out := make([]store.ReceivedGiftState, len(gifts))
+func cloneReceivedGifts(gifts []ReceivedGiftState) []ReceivedGiftState {
+	out := make([]ReceivedGiftState, len(gifts))
 	for i, gift := range gifts {
-		out[i] = store.ReceivedGiftState{
-			GiftCommon: store.GiftCommonState{
+		out[i] = ReceivedGiftState{
+			GiftCommon: GiftCommonState{
 				PossessionType:        gift.GiftCommon.PossessionType,
 				PossessionId:          gift.GiftCommon.PossessionId,
 				Count:                 gift.GiftCommon.Count,
@@ -144,6 +136,17 @@ func cloneReceivedGifts(gifts []store.ReceivedGiftState) []store.ReceivedGiftSta
 			},
 			ReceivedDatetime: gift.ReceivedDatetime,
 		}
+	}
+	return out
+}
+
+func cloneSliceMap[T any](m map[string][]T) map[string][]T {
+	if m == nil {
+		return nil
+	}
+	out := make(map[string][]T, len(m))
+	for k, v := range m {
+		out[k] = append([]T(nil), v...)
 	}
 	return out
 }

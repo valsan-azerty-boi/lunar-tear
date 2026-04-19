@@ -71,8 +71,7 @@ func (s *WeaponServiceServer) Protect(ctx context.Context, req *pb.ProtectReques
 		}
 	})
 
-	tables := userdata.FullClientTableMap(snapshot)
-	diff := userdata.BuildDiffFromTables(userdata.SelectTables(tables, []string{"IUserWeapon"}))
+	diff := userdata.BuildDiffFromTables(userdata.ProjectTables(snapshot, []string{"IUserWeapon"}))
 	return &pb.ProtectResponse{DiffUserData: diff}, nil
 }
 
@@ -95,8 +94,7 @@ func (s *WeaponServiceServer) Unprotect(ctx context.Context, req *pb.UnprotectRe
 		}
 	})
 
-	tables := userdata.FullClientTableMap(snapshot)
-	diff := userdata.BuildDiffFromTables(userdata.SelectTables(tables, []string{"IUserWeapon"}))
+	diff := userdata.BuildDiffFromTables(userdata.ProjectTables(snapshot, []string{"IUserWeapon"}))
 	return &pb.UnprotectResponse{DiffUserData: diff}, nil
 }
 
@@ -165,8 +163,7 @@ func (s *WeaponServiceServer) EnhanceByMaterial(ctx context.Context, req *pb.Enh
 		return nil, fmt.Errorf("weapon enhance by material: %w", err)
 	}
 
-	tables := userdata.FullClientTableMap(snapshot)
-	diff := userdata.BuildDiffFromTables(userdata.SelectTables(tables, weaponDiffTables))
+	diff := userdata.BuildDiffFromTables(userdata.ProjectTables(snapshot, weaponDiffTables))
 	userdata.AddWeaponStoryDiff(diff, snapshot, changedStoryIds)
 
 	return &pb.EnhanceByMaterialResponse{
@@ -181,7 +178,7 @@ func (s *WeaponServiceServer) Sell(ctx context.Context, req *pb.SellRequest) (*p
 
 	userId := currentUserId(ctx, s.users, s.sessions)
 
-	oldUser, _ := s.users.SnapshotUser(userId)
+	oldUser, _ := s.users.LoadUser(userId)
 	tracker := userdata.NewDeleteTracker().
 		Track("IUserWeapon", oldUser, userdata.SortedWeaponRecords, []string{"userId", "userWeaponUuid"}).
 		Track("IUserWeaponSkill", oldUser, userdata.SortedWeaponSkillRecords, []string{"userId", "userWeaponUuid", "slotNumber"}).
@@ -229,7 +226,7 @@ func (s *WeaponServiceServer) Sell(ctx context.Context, req *pb.SellRequest) (*p
 	}
 
 	sellDiffTables := []string{"IUserWeapon", "IUserWeaponSkill", "IUserWeaponAbility", "IUserWeaponAwaken", "IUserConsumableItem"}
-	tables := userdata.SelectTables(userdata.FullClientTableMap(snapshot), sellDiffTables)
+	tables := userdata.ProjectTables(snapshot, sellDiffTables)
 	diff := tracker.Apply(snapshot, tables)
 
 	return &pb.SellResponse{DiffUserData: diff}, nil
@@ -307,8 +304,7 @@ func (s *WeaponServiceServer) Evolve(ctx context.Context, req *pb.EvolveRequest)
 		return nil, fmt.Errorf("weapon evolve: %w", err)
 	}
 
-	tables := userdata.FullClientTableMap(snapshot)
-	diff := userdata.BuildDiffFromTables(userdata.SelectTables(tables, weaponDiffTables))
+	diff := userdata.BuildDiffFromTables(userdata.ProjectTables(snapshot, weaponDiffTables))
 	userdata.AddWeaponStoryDiff(diff, snapshot, changedStoryIds)
 
 	return &pb.EvolveResponse{DiffUserData: diff}, nil
@@ -407,8 +403,7 @@ func (s *WeaponServiceServer) EnhanceSkill(ctx context.Context, req *pb.EnhanceS
 		return nil, fmt.Errorf("weapon enhance skill: %w", err)
 	}
 
-	tables := userdata.FullClientTableMap(snapshot)
-	diff := userdata.BuildDiffFromTables(userdata.SelectTables(tables, weaponDiffTables))
+	diff := userdata.BuildDiffFromTables(userdata.ProjectTables(snapshot, weaponDiffTables))
 
 	return &pb.EnhanceSkillResponse{DiffUserData: diff}, nil
 }
@@ -506,8 +501,7 @@ func (s *WeaponServiceServer) EnhanceAbility(ctx context.Context, req *pb.Enhanc
 		return nil, fmt.Errorf("weapon enhance ability: %w", err)
 	}
 
-	tables := userdata.FullClientTableMap(snapshot)
-	diff := userdata.BuildDiffFromTables(userdata.SelectTables(tables, weaponDiffTables))
+	diff := userdata.BuildDiffFromTables(userdata.ProjectTables(snapshot, weaponDiffTables))
 
 	return &pb.EnhanceAbilityResponse{DiffUserData: diff}, nil
 }
@@ -578,8 +572,7 @@ func (s *WeaponServiceServer) LimitBreakByMaterial(ctx context.Context, req *pb.
 		return nil, fmt.Errorf("weapon limit break by material: %w", err)
 	}
 
-	tables := userdata.FullClientTableMap(snapshot)
-	diff := userdata.BuildDiffFromTables(userdata.SelectTables(tables, limitBreakDiffTables))
+	diff := userdata.BuildDiffFromTables(userdata.ProjectTables(snapshot, limitBreakDiffTables))
 
 	return &pb.LimitBreakByMaterialResponse{DiffUserData: diff}, nil
 }
@@ -590,7 +583,7 @@ func (s *WeaponServiceServer) LimitBreakByWeapon(ctx context.Context, req *pb.Li
 	userId := currentUserId(ctx, s.users, s.sessions)
 	nowMillis := gametime.NowMillis()
 
-	oldUser, _ := s.users.SnapshotUser(userId)
+	oldUser, _ := s.users.LoadUser(userId)
 	tracker := userdata.NewDeleteTracker().
 		Track("IUserWeapon", oldUser, userdata.SortedWeaponRecords, []string{"userId", "userWeaponUuid"}).
 		Track("IUserWeaponSkill", oldUser, userdata.SortedWeaponSkillRecords, []string{"userId", "userWeaponUuid", "slotNumber"}).
@@ -665,7 +658,7 @@ func (s *WeaponServiceServer) LimitBreakByWeapon(ctx context.Context, req *pb.Li
 		return nil, fmt.Errorf("weapon limit break by weapon: %w", err)
 	}
 
-	tables := userdata.SelectTables(userdata.FullClientTableMap(snapshot), limitBreakDiffTables)
+	tables := userdata.ProjectTables(snapshot, limitBreakDiffTables)
 	diff := tracker.Apply(snapshot, tables)
 
 	return &pb.LimitBreakByWeaponResponse{DiffUserData: diff}, nil
@@ -677,7 +670,7 @@ func (s *WeaponServiceServer) EnhanceByWeapon(ctx context.Context, req *pb.Enhan
 	userId := currentUserId(ctx, s.users, s.sessions)
 	nowMillis := gametime.NowMillis()
 
-	oldUser, _ := s.users.SnapshotUser(userId)
+	oldUser, _ := s.users.LoadUser(userId)
 	tracker := userdata.NewDeleteTracker().
 		Track("IUserWeapon", oldUser, userdata.SortedWeaponRecords, []string{"userId", "userWeaponUuid"}).
 		Track("IUserWeaponSkill", oldUser, userdata.SortedWeaponSkillRecords, []string{"userId", "userWeaponUuid", "slotNumber"}).
@@ -753,7 +746,7 @@ func (s *WeaponServiceServer) EnhanceByWeapon(ctx context.Context, req *pb.Enhan
 		return nil, fmt.Errorf("weapon enhance by weapon: %w", err)
 	}
 
-	tables := userdata.SelectTables(userdata.FullClientTableMap(snapshot), weaponDiffTables)
+	tables := userdata.ProjectTables(snapshot, weaponDiffTables)
 	diff := tracker.Apply(snapshot, tables)
 	userdata.AddWeaponStoryDiff(diff, snapshot, changedStoryIds)
 
@@ -864,8 +857,7 @@ func (s *WeaponServiceServer) Awaken(ctx context.Context, req *pb.WeaponAwakenRe
 		return nil, fmt.Errorf("weapon awaken: %w", err)
 	}
 
-	tables := userdata.FullClientTableMap(snapshot)
-	diff := userdata.BuildDiffFromTables(userdata.SelectTables(tables, weaponAwakenDiffTables))
+	diff := userdata.BuildDiffFromTables(userdata.ProjectTables(snapshot, weaponAwakenDiffTables))
 
 	return &pb.WeaponAwakenResponse{DiffUserData: diff}, nil
 }

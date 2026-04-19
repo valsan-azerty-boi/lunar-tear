@@ -11,15 +11,15 @@ import (
 
 type BannerServiceServer struct {
 	pb.UnimplementedBannerServiceServer
-	gacha store.GachaRepository
+	catalog []store.GachaCatalogEntry
 }
 
-func NewBannerServiceServer(gacha store.GachaRepository) *BannerServiceServer {
-	return &BannerServiceServer{gacha: gacha}
+func NewBannerServiceServer(catalog []store.GachaCatalogEntry) *BannerServiceServer {
+	return &BannerServiceServer{catalog: catalog}
 }
 
 func (s *BannerServiceServer) GetMamaBanner(ctx context.Context, req *pb.GetMamaBannerRequest) (*pb.GetMamaBannerResponse, error) {
-	catalog, _ := s.gacha.SnapshotCatalog()
+	catalog := s.catalog
 	var termLimited []*pb.GachaBanner
 	var latestChapter *pb.GachaBanner
 	for _, entry := range catalog {

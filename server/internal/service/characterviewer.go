@@ -29,7 +29,7 @@ func (s *CharacterViewerServiceServer) CharacterViewerTop(ctx context.Context, _
 	log.Printf("[CharacterViewerService] CharacterViewerTop")
 
 	userId := currentUserId(ctx, s.users, s.sessions)
-	user, err := s.users.SnapshotUser(userId)
+	user, err := s.users.LoadUser(userId)
 	if err != nil {
 		panic(fmt.Sprintf("CharacterViewerTop: no user for userId=%d: %v", userId, err))
 	}

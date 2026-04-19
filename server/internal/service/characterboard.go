@@ -27,7 +27,7 @@ func (s *CharacterBoardServiceServer) ReleasePanel(ctx context.Context, req *pb.
 
 	userId := currentUserId(ctx, s.users, s.sessions)
 
-	oldUser, _ := s.users.SnapshotUser(userId)
+	oldUser, _ := s.users.LoadUser(userId)
 	tracker := userdata.NewDeleteTracker().
 		Track("IUserMaterial", oldUser, userdata.SortedMaterialRecords, []string{"userId", "materialId"}).
 		Track("IUserConsumableItem", oldUser, userdata.SortedConsumableItemRecords, []string{"userId", "consumableItemId"})
@@ -54,7 +54,7 @@ func (s *CharacterBoardServiceServer) ReleasePanel(ctx context.Context, req *pb.
 		"IUserConsumableItem",
 		"IUserGem",
 	}
-	tables := userdata.SelectTables(userdata.FullClientTableMap(user), boardTables)
+	tables := userdata.ProjectTables(user, boardTables)
 	diff := tracker.Apply(user, tables)
 
 	return &pb.ReleasePanelResponse{DiffUserData: diff}, nil

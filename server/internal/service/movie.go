@@ -36,8 +36,7 @@ func (s *MovieServiceServer) SaveViewedMovie(ctx context.Context, req *pb.SaveVi
 		return nil, fmt.Errorf("update user: %w", err)
 	}
 
-	tables := userdata.FullClientTableMap(snapshot)
-	diff := userdata.BuildDiffFromTables(userdata.SelectTables(tables, []string{"IUserMovie"}))
+	diff := userdata.BuildDiffFromTables(userdata.ProjectTables(snapshot, []string{"IUserMovie"}))
 
 	return &pb.SaveViewedMovieResponse{
 		DiffUserData: diff,

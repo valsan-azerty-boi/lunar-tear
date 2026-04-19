@@ -35,6 +35,9 @@ type GameConfig struct {
 	QuestSkipMaxCountAtOnce   int32
 
 	WeaponLimitBreakAvailableCount int32
+
+	CostumeLotteryEffectUnlockSlotConsumeGold int32
+	CostumeLotteryEffectDrawSlotConsumeGold   int32
 }
 
 func LoadGameConfig() (*GameConfig, error) {
@@ -72,6 +75,9 @@ func LoadGameConfig() (*GameConfig, error) {
 	cfg.QuestSkipMaxCountAtOnce = parseInt32(kv, "QUEST_SKIP_MAX_COUNT_AT_ONCE")
 
 	cfg.WeaponLimitBreakAvailableCount = parseInt32(kv, "WEAPON_LIMIT_BREAK_AVAILABLE_COUNT")
+
+	cfg.CostumeLotteryEffectUnlockSlotConsumeGold = parseInt32(kv, "COSTUME_LOTTERY_EFFECT_UNLOCK_SLOT_CONSUME_GOLD")
+	cfg.CostumeLotteryEffectDrawSlotConsumeGold = parseInt32(kv, "COSTUME_LOTTERY_EFFECT_DRAW_SLOT_CONSUME_GOLD")
 
 	return cfg, nil
 }

@@ -37,7 +37,7 @@ func (s *PartsServiceServer) Sell(ctx context.Context, req *pb.PartsSellRequest)
 
 	userId := currentUserId(ctx, s.users, s.sessions)
 
-	oldUser, _ := s.users.SnapshotUser(userId)
+	oldUser, _ := s.users.LoadUser(userId)
 	tracker := userdata.NewDeleteTracker().
 		Track("IUserParts", oldUser, userdata.SortedPartsRecords, []string{"userId", "userPartsUuid"})
 
@@ -81,7 +81,7 @@ func (s *PartsServiceServer) Sell(ctx context.Context, req *pb.PartsSellRequest)
 		return nil, fmt.Errorf("parts sell: %w", err)
 	}
 
-	tables := userdata.SelectTables(userdata.FullClientTableMap(snapshot), partsDiffTables)
+	tables := userdata.ProjectTables(snapshot, partsDiffTables)
 	diff := tracker.Apply(snapshot, tables)
 
 	return &pb.PartsSellResponse{
@@ -158,8 +158,7 @@ func (s *PartsServiceServer) Enhance(ctx context.Context, req *pb.PartsEnhanceRe
 		return nil, fmt.Errorf("parts enhance: %w", err)
 	}
 
-	tables := userdata.FullClientTableMap(snapshot)
-	diff := userdata.BuildDiffFromTables(userdata.SelectTables(tables, partsDiffTables))
+	diff := userdata.BuildDiffFromTables(userdata.ProjectTables(snapshot, partsDiffTables))
 
 	return &pb.PartsEnhanceResponse{
 		IsSuccess:    isSuccess,
@@ -187,8 +186,7 @@ func (s *PartsServiceServer) ReplacePreset(ctx context.Context, req *pb.PartsRep
 		return nil, fmt.Errorf("parts replace preset: %w", err)
 	}
 
-	tables := userdata.FullClientTableMap(snapshot)
-	diff := userdata.BuildDiffFromTables(userdata.SelectTables(tables, []string{"IUserPartsPreset"}))
+	diff := userdata.BuildDiffFromTables(userdata.ProjectTables(snapshot, []string{"IUserPartsPreset"}))
 
 	return &pb.PartsReplacePresetResponse{
 		DiffUserData: diff,
