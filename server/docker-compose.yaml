@@ -4,13 +4,12 @@ services:
     image: kretts/lunar-tear:latest
     environment:
       LUNAR_HOST: 127.0.0.1
-      LUNAR_HTTP_PORT: 8080
-      LUNAR_GRPC_PORT: 8003
+      LUNAR_HTTP_PORT: 8880
+      LUNAR_GRPC_PORT: 8881
     volumes:
       - ./assets:/opt/lunar-tear/assets
       - ./db:/opt/lunar-tear/db
     ports:
-      - 8003:8003
-      - 8080:8080
+      - 8881:8881
+      - 8880:8880
 
-      
