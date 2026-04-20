@@ -67,12 +67,13 @@ go run ./cmd/import-snapshot \
 
 ```bash
 cd server
-sudo go run ./cmd/lunar-tear \
+go run ./cmd/lunar-tear \
   --host 10.0.2.2 \
-  --http-port 8080
+  --http-port 8080 \
+  --grpc-port 8003
 ```
 
-`sudo` is needed because gRPC binds to port 443 (privileged). On Linux you can use `setcap` instead:
+The default gRPC port is 443, which requires `sudo` (privileged port). Use `--grpc-port` with a high port to avoid this. If you do need port 443, either use `sudo` or grant the binary the capability on Linux:
 
 ```bash
 go build -o lunar-tear ./cmd/lunar-tear
@@ -82,18 +83,19 @@ sudo setcap cap_net_bind_service=+ep ./lunar-tear
 
 ### Ports
 
-| Protocol | Port | Notes                                                |
-| -------- | ---- | ---------------------------------------------------- |
-| gRPC     | 443  | hardcoded by the client, not configurable            |
-| HTTP     | 8080 | Octo asset API + game web pages (`--http-port` flag) |
+| Protocol | Port | Notes                                                       |
+| -------- | ---- | ----------------------------------------------------------- |
+| gRPC     | 443  | default; configurable with `--grpc-port` (requires patched client) |
+| HTTP     | 8080 | Octo asset API + game web pages (`--http-port` flag)        |
 
 ### Flags
 
-| Flag          | Default      | Description                     |
-| ------------- | ------------ | ------------------------------- |
-| `--host`      | `127.0.0.1`  | hostname/IP given to the client |
-| `--http-port` | `8080`       | HTTP/Octo server port           |
-| `--db`        | `db/game.db` | SQLite database path            |
+| Flag          | Default      | Description                                          |
+| ------------- | ------------ | ---------------------------------------------------- |
+| `--host`      | `127.0.0.1`  | hostname/IP given to the client                      |
+| `--http-port` | `8080`       | HTTP/Octo server port                                |
+| `--grpc-port` | `443`        | gRPC server port (client must be patched to match)   |
+| `--db`        | `db/game.db` | SQLite database path                                 |
 
 ### Docker
 

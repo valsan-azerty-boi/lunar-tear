@@ -16,6 +16,7 @@ import (
 
 func main() {
 	httpPort := flag.Int("http-port", 8080, "HTTP server port (Octo API)")
+	grpcPort := flag.Int("grpc-port", 443, "gRPC server port")
 	host := flag.String("host", "127.0.0.1", "hostname the client will connect to")
 	dbPath := flag.String("db", "db/game.db", "SQLite database path")
 	flag.Parse()
@@ -165,6 +166,7 @@ func main() {
 
 	startGRPC(
 		*host,
+		*grpcPort,
 		octoURL,
 		userStore,
 		questHandler,

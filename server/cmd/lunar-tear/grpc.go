@@ -37,6 +37,7 @@ func (l loggingListener) Accept() (net.Conn, error) {
 
 func startGRPC(
 	host string,
+	grpcPort int,
 	octoURL string,
 	userStore interface {
 		store.UserRepository
@@ -64,9 +65,10 @@ func startGRPC(
 	sideStoryCatalog *masterdata.SideStoryCatalog,
 	bigHuntCatalog *masterdata.BigHuntCatalog,
 ) {
-	lis, err := net.Listen("tcp", ":443")
+	addr := fmt.Sprintf(":%d", grpcPort)
+	lis, err := net.Listen("tcp", addr)
 	if err != nil {
-		log.Fatalf("failed to listen on :443: %v", err)
+		log.Fatalf("failed to listen on %s: %v", addr, err)
 	}
 	lis = loggingListener{Listener: lis}
 
@@ -77,6 +79,7 @@ func startGRPC(
 
 	registerServices(grpcServer,
 		host,
+		grpcPort,
 		octoURL,
 		userStore,
 		questEngine,
@@ -104,8 +107,8 @@ func startGRPC(
 
 	reflection.Register(grpcServer)
 
-	log.Printf("gRPC server listening on :443")
-	log.Printf("client host address: %s:443", host)
+	log.Printf("gRPC server listening on %s", addr)
+	log.Printf("client host address: %s:%d", host, grpcPort)
 
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
@@ -115,6 +118,7 @@ func startGRPC(
 func registerServices(
 	srv *grpc.Server,
 	host string,
+	grpcPort int,
 	octoURL string,
 	userStore interface {
 		store.UserRepository
@@ -145,7 +149,7 @@ func registerServices(
 	pb.RegisterBannerServiceServer(srv, service.NewBannerServiceServer(gachaEntries))
 	pb.RegisterUserServiceServer(srv, service.NewUserServiceServer(userStore, userStore))
 	pb.RegisterBattleServiceServer(srv, service.NewBattleServiceServer(userStore, userStore))
-	pb.RegisterConfigServiceServer(srv, service.NewConfigServiceServer(host, int32(443), octoURL))
+	pb.RegisterConfigServiceServer(srv, service.NewConfigServiceServer(host, int32(grpcPort), octoURL))
 	pb.RegisterDataServiceServer(srv, service.NewDataServiceServer(userStore, userStore))
 	pb.RegisterTutorialServiceServer(srv, service.NewTutorialServiceServer(userStore, userStore, questEngine))
 	pb.RegisterGachaServiceServer(srv, service.NewGachaServiceServer(userStore, userStore, gachaEntries, gachaHandler))
