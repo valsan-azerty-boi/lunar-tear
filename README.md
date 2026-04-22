@@ -15,6 +15,17 @@ Discord server: https://discord.gg/MZAf5aVkJG
 go install github.com/pressly/goose/v3/cmd/goose@latest
 ```
 
+### Quick Start (Wizard)
+
+The interactive wizard walks you through setup with a few simple questions — no flags or networking knowledge needed. It auto-detects the right IP address for your emulator or phone and launches all services.
+
+```bash
+cd server
+go run ./cmd/wizard
+```
+
+Your choices are saved so next time you just press Enter to relaunch with the same settings.
+
 ### Regenerate protobuf stubs
 
 ```bash

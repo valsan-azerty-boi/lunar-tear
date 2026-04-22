@@ -10,6 +10,8 @@ server/auth-server
 server/claim-account
 server/octo-cdn
 server/dev
+server/wizard
+server/.wizard.json
 
 __pycache__/
 
