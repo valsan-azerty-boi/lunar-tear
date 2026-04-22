@@ -151,7 +151,7 @@ func registerServices(
 	pb.RegisterUserServiceServer(srv, service.NewUserServiceServer(userStore, userStore))
 	pb.RegisterBattleServiceServer(srv, service.NewBattleServiceServer(userStore, userStore))
 	pb.RegisterConfigServiceServer(srv, service.NewConfigServiceServer(host, int32(grpcPort), octoURL))
-	pb.RegisterDataServiceServer(srv, service.NewDataServiceServer(userStore, userStore))
+	pb.RegisterDataServiceServer(srv, service.NewDataServiceServer(userStore, userStore, scheduleManager))
 	pb.RegisterTutorialServiceServer(srv, service.NewTutorialServiceServer(userStore, userStore, questEngine))
 	pb.RegisterGachaServiceServer(srv, service.NewGachaServiceServer(userStore, userStore, scheduleManager, gachaHandler))
 	pb.RegisterGiftServiceServer(srv, service.NewGiftServiceServer(userStore, userStore))

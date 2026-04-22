@@ -1,6 +1,10 @@
 {
   "mode": "bundles",
-  "active_bundles": [],
+  "active_bundles": [
+    "2019-12",
+    "2020-05",
+    "2021-07"
+  ],
   "always_enabled": {
     "event_chapters": [],
     "side_story_quests": []

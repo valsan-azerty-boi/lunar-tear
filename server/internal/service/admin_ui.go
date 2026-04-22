@@ -287,6 +287,7 @@ body {
 
 <script>
 let bundles = [];
+let currentBundleData = null;
 let schedule = { mode: "bundles", active_bundles: [], always_enabled: { event_chapters: [], side_story_quests: [] }, disabled_overrides: { event_chapters: [], gacha_ids: [], login_bonus_ids: [] }, unreleased_enabled: false };
 let pendingChanges = false;
 
@@ -297,6 +298,7 @@ async function init() {
       fetch("/admin/api/status").then(r => r.json())
     ]);
     bundles = bundleRes.bundles || [];
+    currentBundleData = bundleRes;
     schedule = statusRes.schedule;
     updateStats(statusRes.stats);
     renderBundles(bundleRes);
@@ -448,14 +450,14 @@ function presetNone() {
   schedule.active_bundles = [];
   schedule.unreleased_enabled = false;
   markDirty();
-  init();
+  renderBundles(currentBundleData);
 }
 
 function presetAll() {
   schedule.active_bundles = bundles.map(b => b.month).filter(m => !isUnreleased(m) && m !== "unknown" && m !== "1970-01");
   schedule.unreleased_enabled = false;
   markDirty();
-  init();
+  renderBundles(currentBundleData);
 }
 
 function presetChronological() {
@@ -465,7 +467,7 @@ function presetChronological() {
   schedule.active_bundles = validMonths.filter(m => m <= upTo);
   schedule.unreleased_enabled = false;
   markDirty();
-  init();
+  renderBundles(currentBundleData);
 }
 
 function showToast(msg, type) {

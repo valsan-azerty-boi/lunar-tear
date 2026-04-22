@@ -6,6 +6,7 @@ import (
 	"log"
 
 	pb "lunar-tear/server/gen/proto"
+	"lunar-tear/server/internal/schedule"
 	"lunar-tear/server/internal/store"
 	"lunar-tear/server/internal/userdata"
 
@@ -16,16 +17,18 @@ type DataServiceServer struct {
 	pb.UnimplementedDataServiceServer
 	users    store.UserRepository
 	sessions store.SessionRepository
+	schedule *schedule.Manager
 }
 
-func NewDataServiceServer(users store.UserRepository, sessions store.SessionRepository) *DataServiceServer {
-	return &DataServiceServer{users: users, sessions: sessions}
+func NewDataServiceServer(users store.UserRepository, sessions store.SessionRepository, schedule *schedule.Manager) *DataServiceServer {
+	return &DataServiceServer{users: users, sessions: sessions, schedule: schedule}
 }
 
 func (s *DataServiceServer) GetLatestMasterDataVersion(ctx context.Context, _ *emptypb.Empty) (*pb.MasterDataGetLatestVersionResponse, error) {
-	log.Printf("[DataService] GetLatestMasterDataVersion")
+	version := fmt.Sprintf("20240404193219_%d", s.schedule.LastUpdatedMillis())
+	log.Printf("[DataService] GetLatestMasterDataVersion -> %s", version)
 	return &pb.MasterDataGetLatestVersionResponse{
-		LatestMasterDataVersion: "20240404193219",
+		LatestMasterDataVersion: version,
 	}, nil
 }
 

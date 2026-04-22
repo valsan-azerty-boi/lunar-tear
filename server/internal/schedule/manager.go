@@ -3,7 +3,10 @@ package schedule
 import (
 	"fmt"
 	"log"
+	"os/exec"
+	"path/filepath"
 	"sync"
+	"time"
 
 	"lunar-tear/server/internal/store"
 )
@@ -25,6 +28,8 @@ type Manager struct {
 
 	// Filtered views — rebuilt on each Reload()
 	filteredGachaEntries []store.GachaCatalogEntry
+
+	lastUpdatedMillis int64
 }
 
 // NewManager creates a schedule manager with the given config path and full catalogs.
@@ -41,13 +46,15 @@ func NewManager(
 	bundleIndex := BuildBundleIndex()
 
 	m := &Manager{
-		configPath:      configPath,
-		schedule:        sched,
-		bundleIndex:     bundleIndex,
-		allGachaEntries: allGachaEntries,
+		configPath:        configPath,
+		schedule:          sched,
+		bundleIndex:       bundleIndex,
+		allGachaEntries:   allGachaEntries,
+		lastUpdatedMillis: time.Now().UnixMilli(),
 	}
 
 	m.rebuildFiltered()
+	m.runPatchScript()
 
 	log.Printf("[schedule] manager initialized: %d/%d gacha entries active, %d bundles enabled",
 		len(m.filteredGachaEntries), len(m.allGachaEntries), len(sched.ActiveBundles))
@@ -68,6 +75,8 @@ func (m *Manager) Reload() error {
 
 	m.schedule = sched
 	m.rebuildFiltered()
+	m.runPatchScript()
+	m.lastUpdatedMillis = time.Now().UnixMilli()
 
 	log.Printf("[schedule] reloaded: %d/%d gacha entries active, %d bundles enabled",
 		len(m.filteredGachaEntries), len(m.allGachaEntries), len(sched.ActiveBundles))
@@ -86,6 +95,8 @@ func (m *Manager) UpdateSchedule(sched *ContentSchedule) error {
 
 	m.schedule = sched
 	m.rebuildFiltered()
+	m.runPatchScript()
+	m.lastUpdatedMillis = time.Now().UnixMilli()
 
 	log.Printf("[schedule] updated: %d/%d gacha entries active, %d bundles enabled",
 		len(m.filteredGachaEntries), len(m.allGachaEntries), len(sched.ActiveBundles))
@@ -107,6 +118,24 @@ func (m *Manager) rebuildFiltered() {
 	m.filteredGachaEntries = filtered
 }
 
+// runPatchScript dynamically updates the database.bin.e using the python script.
+// It assumes python is in the PATH and the server is running from the server/ dir.
+func (m *Manager) runPatchScript() {
+	scriptPath := filepath.Join("..", "..", "lunar-scripts", "patch_masterdata.py")
+	log.Printf("[schedule] Running master data patcher via %s", scriptPath)
+
+	cmd := exec.Command("python", scriptPath, 
+		"--input", filepath.Join("assets", "release", "20240404193219.bin.e"),
+		"--output", filepath.Join("assets", "release", "database.bin.e"),
+		"--sync-schedule", m.configPath)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("[schedule] ERROR: dynamic patching failed: %v\nOutput: %s", err, string(out))
+	} else {
+		log.Printf("[schedule] Dynamic patching completed successfully.")
+	}
+}
+
 // --- Read accessors (concurrent-safe via RLock) ---
 
 // GachaEntries returns the currently filtered gacha catalog entries.
@@ -126,6 +155,13 @@ func (m *Manager) Schedule() ContentSchedule {
 // BundleIndex returns the bundle index (immutable after init).
 func (m *Manager) BundleIndex() *BundleIndex {
 	return m.bundleIndex
+}
+
+// LastUpdatedMillis returns the timestamp when the schedule was last updated.
+func (m *Manager) LastUpdatedMillis() int64 {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.lastUpdatedMillis
 }
 
 // Stats returns current statistics for the admin UI.
