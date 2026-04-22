@@ -10,6 +10,7 @@ import (
 	"lunar-tear/server/internal/gacha"
 	"lunar-tear/server/internal/gametime"
 	"lunar-tear/server/internal/model"
+	"lunar-tear/server/internal/schedule"
 	"lunar-tear/server/internal/store"
 	"lunar-tear/server/internal/userdata"
 
@@ -32,30 +33,30 @@ var gachaDiffTables = []string{
 
 type GachaServiceServer struct {
 	pb.UnimplementedGachaServiceServer
-	users    store.UserRepository
-	sessions store.SessionRepository
-	catalog  []store.GachaCatalogEntry
-	handler  *gacha.GachaHandler
+	users            store.UserRepository
+	sessions         store.SessionRepository
+	scheduleManager  *schedule.Manager
+	handler          *gacha.GachaHandler
 }
 
 func NewGachaServiceServer(
 	users store.UserRepository,
 	sessions store.SessionRepository,
-	catalog []store.GachaCatalogEntry,
+	scheduleManager *schedule.Manager,
 	handler *gacha.GachaHandler,
 ) *GachaServiceServer {
 	return &GachaServiceServer{
-		users:    users,
-		sessions: sessions,
-		catalog:  catalog,
-		handler:  handler,
+		users:           users,
+		sessions:        sessions,
+		scheduleManager: scheduleManager,
+		handler:         handler,
 	}
 }
 
 func (s *GachaServiceServer) GetGachaList(ctx context.Context, req *pb.GetGachaListRequest) (*pb.GetGachaListResponse, error) {
 	log.Printf("[GachaService] GetGachaList: labels=%v", req.GachaLabelType)
 
-	catalog := s.catalog
+	catalog := s.scheduleManager.GachaEntries()
 	userId := currentUserId(ctx, s.users, s.sessions)
 	nowMillis := gametime.NowMillis()
 
@@ -132,7 +133,7 @@ func (s *GachaServiceServer) autoConvertExpiredMedals(user *store.UserState, cat
 func (s *GachaServiceServer) GetGacha(ctx context.Context, req *pb.GetGachaRequest) (*pb.GetGachaResponse, error) {
 	log.Printf("[GachaService] GetGacha: ids=%v", req.GachaId)
 
-	catalog := s.catalog
+	catalog := s.scheduleManager.GachaEntries()
 
 	userId := currentUserId(ctx, s.users, s.sessions)
 	user, err := s.users.LoadUser(userId)
@@ -160,7 +161,7 @@ func (s *GachaServiceServer) GetGacha(ctx context.Context, req *pb.GetGachaReque
 func (s *GachaServiceServer) Draw(ctx context.Context, req *pb.DrawRequest) (*pb.DrawResponse, error) {
 	log.Printf("[GachaService] Draw: gachaId=%d phaseId=%d execCount=%d", req.GachaId, req.GachaPricePhaseId, req.ExecCount)
 
-	entry := findCatalogEntry(s.catalog, req.GachaId)
+	entry := findCatalogEntry(s.scheduleManager.GachaEntries(), req.GachaId)
 	if entry == nil {
 		return nil, fmt.Errorf("gacha %d not found", req.GachaId)
 	}
@@ -307,7 +308,7 @@ func (s *GachaServiceServer) Draw(ctx context.Context, req *pb.DrawRequest) (*pb
 func (s *GachaServiceServer) ResetBoxGacha(ctx context.Context, req *pb.ResetBoxGachaRequest) (*pb.ResetBoxGachaResponse, error) {
 	log.Printf("[GachaService] ResetBoxGacha: gachaId=%d", req.GachaId)
 
-	entry := findCatalogEntry(s.catalog, req.GachaId)
+	entry := findCatalogEntry(s.scheduleManager.GachaEntries(), req.GachaId)
 	if entry == nil {
 		return nil, fmt.Errorf("gacha %d not found", req.GachaId)
 	}

@@ -5,21 +5,21 @@ import (
 
 	pb "lunar-tear/server/gen/proto"
 	"lunar-tear/server/internal/model"
-	"lunar-tear/server/internal/store"
+	"lunar-tear/server/internal/schedule"
 	"lunar-tear/server/internal/userdata"
 )
 
 type BannerServiceServer struct {
 	pb.UnimplementedBannerServiceServer
-	catalog []store.GachaCatalogEntry
+	scheduleManager *schedule.Manager
 }
 
-func NewBannerServiceServer(catalog []store.GachaCatalogEntry) *BannerServiceServer {
-	return &BannerServiceServer{catalog: catalog}
+func NewBannerServiceServer(scheduleManager *schedule.Manager) *BannerServiceServer {
+	return &BannerServiceServer{scheduleManager: scheduleManager}
 }
 
 func (s *BannerServiceServer) GetMamaBanner(ctx context.Context, req *pb.GetMamaBannerRequest) (*pb.GetMamaBannerResponse, error) {
-	catalog := s.catalog
+	catalog := s.scheduleManager.GachaEntries()
 	var termLimited []*pb.GachaBanner
 	var latestChapter *pb.GachaBanner
 	for _, entry := range catalog {

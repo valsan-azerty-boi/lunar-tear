@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"log"
+	"net/http"
 	"strconv"
 	"strings"
 
@@ -11,6 +12,8 @@ import (
 	"lunar-tear/server/internal/gametime"
 	"lunar-tear/server/internal/masterdata"
 	"lunar-tear/server/internal/questflow"
+	"lunar-tear/server/internal/schedule"
+	"lunar-tear/server/internal/service"
 	"lunar-tear/server/internal/store/sqlite"
 )
 
@@ -19,6 +22,7 @@ func main() {
 	grpcPort := flag.Int("grpc-port", 443, "gRPC server port")
 	host := flag.String("host", "127.0.0.1", "hostname the client will connect to")
 	dbPath := flag.String("db", "db/game.db", "SQLite database path")
+	contentSchedulePath := flag.String("content-schedule", "content_schedule.json", "Path to content schedule config")
 	flag.Parse()
 
 	octoURL := "http://" + *host + ":" + strconv.Itoa(*httpPort)
@@ -31,7 +35,7 @@ func main() {
 		resourcesBaseURL = prefix + strings.Repeat("r", padLen)
 	}
 
-	go startHTTP(*httpPort, resourcesBaseURL)
+	var adminMux *http.ServeMux // set after scheduleManager is created
 
 	db, err := database.Open(*dbPath)
 	if err != nil {
@@ -65,6 +69,11 @@ func main() {
 		log.Fatalf("load gacha catalog: %v", err)
 	}
 	log.Printf("gacha catalog loaded: %d entries", len(gachaEntries))
+
+	scheduleManager, err := schedule.NewManager(*contentSchedulePath, gachaEntries)
+	if err != nil {
+		log.Fatalf("load content schedule: %v", err)
+	}
 
 	gachaPool, err := masterdata.LoadGachaPool()
 	if err != nil {
@@ -164,6 +173,9 @@ func main() {
 	sideStoryCatalog := masterdata.LoadSideStoryCatalog()
 	bigHuntCatalog := masterdata.LoadBigHuntCatalog()
 
+	adminMux = service.RegisterAdminRoutes(scheduleManager)
+	go startHTTP(*httpPort, resourcesBaseURL, adminMux)
+
 	startGRPC(
 		*host,
 		*grpcPort,
@@ -171,7 +183,7 @@ func main() {
 		userStore,
 		questHandler,
 		gachaHandler,
-		gachaEntries,
+		scheduleManager,
 		cageOrnamentCatalog,
 		loginBonusCatalog,
 		characterViewerCatalog,

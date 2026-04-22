@@ -1,0 +1,14 @@
+{
+  "mode": "bundles",
+  "active_bundles": [],
+  "always_enabled": {
+    "event_chapters": [],
+    "side_story_quests": []
+  },
+  "disabled_overrides": {
+    "event_chapters": [],
+    "gacha_ids": [],
+    "login_bonus_ids": []
+  },
+  "unreleased_enabled": false
+}
