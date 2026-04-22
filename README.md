@@ -141,6 +141,8 @@ go run ./cmd/dev
 
 Each service's output is prefixed with a colored label (`[auth]`, `[cdn]`, `[grpc]`). Press Ctrl+C to shut everything down.
 
+The dev runner automatically builds each service into `bin/` before launching. This means the binaries have stable file paths, so **Windows Firewall only prompts once** — subsequent runs reuse the same allowed executables. The wizard performs the same build step transparently.
+
 Override defaults with namespaced flags:
 
 ```bash
@@ -221,8 +223,11 @@ All targets run from the `server/` directory.
 | `make build`   | Build the game server binary                            |
 | `make build-cdn` | Build the CDN binary                                  |
 | `make build-auth` | Build the auth server binary                          |
+| `make build-dev` | Build the dev runner binary to `bin/`                  |
+| `make build-all` | Build all service binaries to `bin/`                   |
 | `make build-import` | Build the import-snapshot tool                     |
 | `make build-claim-account` | Build the claim-account tool                |
+| `make clean`   | Remove the `bin/` directory                              |
 | `make dev`     | Run all three services with one command                  |
 | `make migrate` | Run goose migrations on `db/game.db`                    |
 | `make import`  | Import a snapshot (`SNAPSHOT=... UUID=...` required)     |

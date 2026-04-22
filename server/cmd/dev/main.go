@@ -10,6 +10,8 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
+	"runtime"
 	"sync"
 	"syscall"
 )
@@ -26,6 +28,53 @@ type service struct {
 	label string
 	color string
 	cmd   *exec.Cmd
+}
+
+func binExt() string {
+	if runtime.GOOS == "windows" {
+		return ".exe"
+	}
+	return ""
+}
+
+func buildAll() {
+	if err := os.MkdirAll("bin", 0755); err != nil {
+		log.Fatalf("create bin/: %v", err)
+	}
+
+	type target struct {
+		name string
+		pkg  string
+	}
+	targets := []target{
+		{"auth-server", "./cmd/auth-server"},
+		{"octo-cdn", "./cmd/octo-cdn"},
+		{"lunar-tear", "./cmd/lunar-tear"},
+	}
+
+	ext := binExt()
+	var wg sync.WaitGroup
+	errs := make(chan error, len(targets))
+
+	for _, t := range targets {
+		wg.Add(1)
+		go func(t target) {
+			defer wg.Done()
+			out := filepath.Join("bin", t.name+ext)
+			cmd := exec.Command("go", "build", "-o", out, t.pkg)
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			if err := cmd.Run(); err != nil {
+				errs <- fmt.Errorf("build %s: %w", t.name, err)
+			}
+		}(t)
+	}
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		log.Fatal(err)
+	}
 }
 
 func main() {
@@ -62,6 +111,10 @@ func main() {
 		colorCyan = ""
 	}
 
+	log.Println("building services...")
+	buildAll()
+
+	ext := binExt()
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -69,7 +122,7 @@ func main() {
 		{
 			label: "auth",
 			color: colorGreen,
-			cmd: exec.CommandContext(ctx, "go", "run", "./cmd/auth-server",
+			cmd: exec.CommandContext(ctx, filepath.Join("bin", "auth-server"+ext),
 				"--listen", *authListen,
 				"--db", *authDB,
 			),
@@ -77,7 +130,7 @@ func main() {
 		{
 			label: "cdn",
 			color: colorCyan,
-			cmd: exec.CommandContext(ctx, "go", "run", "./cmd/octo-cdn",
+			cmd: exec.CommandContext(ctx, filepath.Join("bin", "octo-cdn"+ext),
 				"--listen", *cdnListen,
 				"--public-addr", *cdnPublicAddr,
 			),
@@ -85,7 +138,7 @@ func main() {
 		{
 			label: "grpc",
 			color: colorYellow,
-			cmd: exec.CommandContext(ctx, "go", "run", "./cmd/lunar-tear",
+			cmd: exec.CommandContext(ctx, filepath.Join("bin", "lunar-tear"+ext),
 				"--listen", *grpcListen,
 				"--public-addr", *grpcPublicAddr,
 				"--db", *grpcDB,

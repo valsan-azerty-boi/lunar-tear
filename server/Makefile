@@ -30,6 +30,27 @@ build-auth:
 build-claim-account:
 	go build -o claim-account$(EXE) ./cmd/claim-account
 
+build-dev:
+	go build -o bin/dev$(EXE) ./cmd/dev
+
+build-all:
+ifeq ($(OS),Windows_NT)
+	if not exist bin mkdir bin
+else
+	mkdir -p bin
+endif
+	go build -o bin/dev$(EXE) ./cmd/dev
+	go build -o bin/auth-server$(EXE) ./cmd/auth-server
+	go build -o bin/octo-cdn$(EXE) ./cmd/octo-cdn
+	go build -o bin/lunar-tear$(EXE) ./cmd/lunar-tear
+
+clean:
+ifeq ($(OS),Windows_NT)
+	if exist bin rmdir /s /q bin
+else
+	rm -rf bin
+endif
+
 dev:
 	go run ./cmd/dev $(ARGS)
 
@@ -50,4 +71,4 @@ ifndef UUID
 endif
 	go run ./cmd/import-snapshot --snapshot $(SNAPSHOT) --uuid $(UUID)
 
-.PHONY: proto build build-cdn build-auth build-import build-claim-account dev migrate import
+.PHONY: proto build build-cdn build-auth build-import build-claim-account build-dev build-all clean dev migrate import
