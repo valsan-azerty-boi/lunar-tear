@@ -3,6 +3,7 @@ package schedule
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"time"
 )
@@ -30,9 +31,17 @@ type DisabledOverrides struct {
 }
 
 // LoadSchedule reads and parses a content schedule from the given path.
+// If the file does not exist, a default empty schedule is returned.
 func LoadSchedule(path string) (*ContentSchedule, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
+		if os.IsNotExist(err) {
+			log.Printf("[schedule] %s not found, using default empty schedule", path)
+			return &ContentSchedule{
+				Mode:          "custom",
+				ActiveBundles: []string{},
+			}, nil
+		}
 		return nil, fmt.Errorf("read schedule %s: %w", path, err)
 	}
 	var sched ContentSchedule

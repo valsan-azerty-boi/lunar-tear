@@ -194,8 +194,8 @@ func main() {
 			w.Header().Set("Content-Type", "application/json")
 			w.Write([]byte(`{"ok": true}`))
 		})
-		log.Println("[admin] webhook listener on :8081")
-		if err := http.ListenAndServe(":8081", mux); err != nil {
+		log.Println("[admin] webhook listener on :8082")
+		if err := http.ListenAndServe(":8082", mux); err != nil {
 			log.Printf("[admin] webhook listener failed: %v", err)
 		}
 	}()
