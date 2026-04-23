@@ -10,7 +10,6 @@ import (
 	"lunar-tear/server/internal/model"
 	"lunar-tear/server/internal/questflow"
 	"lunar-tear/server/internal/store"
-	"lunar-tear/server/internal/userdata"
 
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
@@ -32,25 +31,11 @@ func NewBigHuntServiceServer(
 	return &BigHuntServiceServer{users: users, sessions: sessions, catalog: catalog, engine: engine}
 }
 
-var bigHuntDiffTables = []string{
-	"IUserBigHuntProgressStatus",
-	"IUserBigHuntMaxScore",
-	"IUserBigHuntStatus",
-	"IUserBigHuntScheduleMaxScore",
-	"IUserBigHuntWeeklyMaxScore",
-	"IUserBigHuntWeeklyStatus",
-}
-
-func buildBigHuntDiff(user store.UserState, tableNames []string) map[string]*pb.DiffData {
-	tables := userdata.ProjectTables(user, tableNames)
-	return userdata.BuildDiffFromTablesOrdered(tables, tableNames)
-}
-
 func (s *BigHuntServiceServer) StartBigHuntQuest(ctx context.Context, req *pb.StartBigHuntQuestRequest) (*pb.StartBigHuntQuestResponse, error) {
 	log.Printf("[BigHuntService] StartBigHuntQuest: bossQuestId=%d questId=%d deckNumber=%d isDryRun=%v",
 		req.BigHuntBossQuestId, req.BigHuntQuestId, req.UserDeckNumber, req.IsDryRun)
 
-	userId := currentUserId(ctx, s.users, s.sessions)
+	userId := CurrentUserId(ctx, s.users, s.sessions)
 	nowMillis := gametime.NowMillis()
 
 	bhQuest, ok := s.catalog.QuestById[req.BigHuntQuestId]
@@ -58,7 +43,7 @@ func (s *BigHuntServiceServer) StartBigHuntQuest(ctx context.Context, req *pb.St
 		log.Printf("[BigHuntService] StartBigHuntQuest: unknown bigHuntQuestId=%d", req.BigHuntQuestId)
 	}
 
-	user, _ := s.users.UpdateUser(userId, func(user *store.UserState) {
+	s.users.UpdateUser(userId, func(user *store.UserState) {
 		if ok {
 			s.engine.HandleBigHuntQuestStart(user, bhQuest.QuestId, req.UserDeckNumber, nowMillis)
 		}
@@ -80,31 +65,27 @@ func (s *BigHuntServiceServer) StartBigHuntQuest(ctx context.Context, req *pb.St
 		user.BigHuntStatuses[req.BigHuntBossQuestId] = st
 	})
 
-	return &pb.StartBigHuntQuestResponse{
-		DiffUserData: buildBigHuntDiff(user, append([]string{"IUserQuest"}, bigHuntDiffTables...)),
-	}, nil
+	return &pb.StartBigHuntQuestResponse{}, nil
 }
 
 func (s *BigHuntServiceServer) UpdateBigHuntQuestSceneProgress(ctx context.Context, req *pb.UpdateBigHuntQuestSceneProgressRequest) (*pb.UpdateBigHuntQuestSceneProgressResponse, error) {
 	log.Printf("[BigHuntService] UpdateBigHuntQuestSceneProgress: questSceneId=%d", req.QuestSceneId)
 
-	userId := currentUserId(ctx, s.users, s.sessions)
+	userId := CurrentUserId(ctx, s.users, s.sessions)
 	nowMillis := gametime.NowMillis()
-	user, _ := s.users.UpdateUser(userId, func(user *store.UserState) {
+	s.users.UpdateUser(userId, func(user *store.UserState) {
 		user.BigHuntProgress.CurrentQuestSceneId = req.QuestSceneId
 		user.BigHuntProgress.LatestVersion = nowMillis
 	})
 
-	return &pb.UpdateBigHuntQuestSceneProgressResponse{
-		DiffUserData: buildBigHuntDiff(user, []string{"IUserBigHuntProgressStatus"}),
-	}, nil
+	return &pb.UpdateBigHuntQuestSceneProgressResponse{}, nil
 }
 
 func (s *BigHuntServiceServer) FinishBigHuntQuest(ctx context.Context, req *pb.FinishBigHuntQuestRequest) (*pb.FinishBigHuntQuestResponse, error) {
 	log.Printf("[BigHuntService] FinishBigHuntQuest: bossQuestId=%d questId=%d isRetired=%v",
 		req.BigHuntBossQuestId, req.BigHuntQuestId, req.IsRetired)
 
-	userId := currentUserId(ctx, s.users, s.sessions)
+	userId := CurrentUserId(ctx, s.users, s.sessions)
 	nowMillis := gametime.NowMillis()
 
 	bhQuest := s.catalog.QuestById[req.BigHuntQuestId]
@@ -114,7 +95,7 @@ func (s *BigHuntServiceServer) FinishBigHuntQuest(ctx context.Context, req *pb.F
 	var scoreInfo *pb.BigHuntScoreInfo
 	var scoreRewards []*pb.BigHuntReward
 
-	user, _ := s.users.UpdateUser(userId, func(user *store.UserState) {
+	s.users.UpdateUser(userId, func(user *store.UserState) {
 		s.engine.HandleBigHuntQuestFinish(user, bhQuest.QuestId, req.IsRetired, false, nowMillis)
 
 		if req.IsRetired || user.BigHuntProgress.IsDryRun {
@@ -229,18 +210,13 @@ func (s *BigHuntServiceServer) FinishBigHuntQuest(ctx context.Context, req *pb.F
 		BattleReport: &pb.BigHuntBattleReport{
 			BattleReportWave: []*pb.BigHuntBattleReportWave{},
 		},
-		DiffUserData: buildBigHuntDiff(user, append([]string{
-			"IUserQuest",
-			"IUserConsumableItem",
-			"IUserMaterial",
-		}, bigHuntDiffTables...)),
 	}, nil
 }
 
 func (s *BigHuntServiceServer) RestartBigHuntQuest(ctx context.Context, req *pb.RestartBigHuntQuestRequest) (*pb.RestartBigHuntQuestResponse, error) {
 	log.Printf("[BigHuntService] RestartBigHuntQuest: bossQuestId=%d questId=%d", req.BigHuntBossQuestId, req.BigHuntQuestId)
 
-	userId := currentUserId(ctx, s.users, s.sessions)
+	userId := CurrentUserId(ctx, s.users, s.sessions)
 	nowMillis := gametime.NowMillis()
 
 	bhQuest := s.catalog.QuestById[req.BigHuntQuestId]
@@ -248,7 +224,7 @@ func (s *BigHuntServiceServer) RestartBigHuntQuest(ctx context.Context, req *pb.
 	var battleBinary []byte
 	var deckNumber int32
 
-	user, _ := s.users.UpdateUser(userId, func(user *store.UserState) {
+	s.users.UpdateUser(userId, func(user *store.UserState) {
 		s.engine.HandleBigHuntQuestStart(user, bhQuest.QuestId, user.BigHuntDeckNumber, nowMillis)
 
 		user.BigHuntProgress.CurrentQuestSceneId = 0
@@ -267,17 +243,16 @@ func (s *BigHuntServiceServer) RestartBigHuntQuest(ctx context.Context, req *pb.
 	return &pb.RestartBigHuntQuestResponse{
 		BattleBinary: battleBinary,
 		DeckNumber:   deckNumber,
-		DiffUserData: buildBigHuntDiff(user, append([]string{"IUserQuest"}, bigHuntDiffTables...)),
 	}, nil
 }
 
 func (s *BigHuntServiceServer) SkipBigHuntQuest(ctx context.Context, req *pb.SkipBigHuntQuestRequest) (*pb.SkipBigHuntQuestResponse, error) {
 	log.Printf("[BigHuntService] SkipBigHuntQuest: bossQuestId=%d skipCount=%d", req.BigHuntBossQuestId, req.SkipCount)
 
-	userId := currentUserId(ctx, s.users, s.sessions)
+	userId := CurrentUserId(ctx, s.users, s.sessions)
 	nowMillis := gametime.NowMillis()
 
-	user, _ := s.users.UpdateUser(userId, func(user *store.UserState) {
+	s.users.UpdateUser(userId, func(user *store.UserState) {
 		st := user.BigHuntStatuses[req.BigHuntBossQuestId]
 		st.DailyChallengeCount += req.SkipCount
 		st.LatestChallengeDatetime = nowMillis
@@ -286,15 +261,14 @@ func (s *BigHuntServiceServer) SkipBigHuntQuest(ctx context.Context, req *pb.Ski
 	})
 
 	return &pb.SkipBigHuntQuestResponse{
-		ScoreReward:  []*pb.BigHuntReward{},
-		DiffUserData: buildBigHuntDiff(user, bigHuntDiffTables),
+		ScoreReward: []*pb.BigHuntReward{},
 	}, nil
 }
 
 func (s *BigHuntServiceServer) SaveBigHuntBattleInfo(ctx context.Context, req *pb.SaveBigHuntBattleInfoRequest) (*pb.SaveBigHuntBattleInfoResponse, error) {
 	log.Printf("[BigHuntService] SaveBigHuntBattleInfo: elapsedFrames=%d", req.ElapsedFrameCount)
 
-	userId := currentUserId(ctx, s.users, s.sessions)
+	userId := CurrentUserId(ctx, s.users, s.sessions)
 	nowMillis := gametime.NowMillis()
 
 	var totalDamage int64
@@ -306,7 +280,7 @@ func (s *BigHuntServiceServer) SaveBigHuntBattleInfo(ctx context.Context, req *p
 		}
 	}
 
-	user, _ := s.users.UpdateUser(userId, func(user *store.UserState) {
+	s.users.UpdateUser(userId, func(user *store.UserState) {
 		user.BigHuntBattleBinary = req.BattleBinary
 
 		if req.BigHuntBattleDetail != nil {
@@ -322,15 +296,13 @@ func (s *BigHuntServiceServer) SaveBigHuntBattleInfo(ctx context.Context, req *p
 		user.BigHuntProgress.LatestVersion = nowMillis
 	})
 
-	return &pb.SaveBigHuntBattleInfoResponse{
-		DiffUserData: buildBigHuntDiff(user, []string{"IUserBigHuntProgressStatus"}),
-	}, nil
+	return &pb.SaveBigHuntBattleInfoResponse{}, nil
 }
 
 func (s *BigHuntServiceServer) GetBigHuntTopData(ctx context.Context, _ *emptypb.Empty) (*pb.GetBigHuntTopDataResponse, error) {
 	log.Printf("[BigHuntService] GetBigHuntTopData")
 
-	userId := currentUserId(ctx, s.users, s.sessions)
+	userId := CurrentUserId(ctx, s.users, s.sessions)
 	user, _ := s.users.LoadUser(userId)
 
 	nowMillis := gametime.NowMillis()
@@ -368,7 +340,6 @@ func (s *BigHuntServiceServer) GetBigHuntTopData(ctx context.Context, _ *emptypb
 		WeeklyScoreReward:           weeklyRewards,
 		IsReceivedWeeklyScoreReward: ws.IsReceivedWeeklyReward,
 		LastWeekWeeklyScoreReward:   lastWeekRewards,
-		DiffUserData:                buildBigHuntDiff(user, bigHuntDiffTables),
 	}, nil
 }
 

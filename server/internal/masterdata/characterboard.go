@@ -7,66 +7,6 @@ import (
 	"lunar-tear/server/internal/utils"
 )
 
-type CharacterBoardPanelRow struct {
-	CharacterBoardPanelId                       int32 `json:"CharacterBoardPanelId"`
-	CharacterBoardId                            int32 `json:"CharacterBoardId"`
-	CharacterBoardPanelUnlockConditionGroupId   int32 `json:"CharacterBoardPanelUnlockConditionGroupId"`
-	CharacterBoardPanelReleasePossessionGroupId int32 `json:"CharacterBoardPanelReleasePossessionGroupId"`
-	CharacterBoardPanelReleaseRewardGroupId     int32 `json:"CharacterBoardPanelReleaseRewardGroupId"`
-	CharacterBoardPanelReleaseEffectGroupId     int32 `json:"CharacterBoardPanelReleaseEffectGroupId"`
-	SortOrder                                   int32 `json:"SortOrder"`
-	ParentCharacterBoardPanelId                 int32 `json:"ParentCharacterBoardPanelId"`
-	PlaceIndex                                  int32 `json:"PlaceIndex"`
-}
-
-type CharacterBoardReleasePossessionRow struct {
-	CharacterBoardPanelReleasePossessionGroupId int32 `json:"CharacterBoardPanelReleasePossessionGroupId"`
-	PossessionType                              int32 `json:"PossessionType"`
-	PossessionId                                int32 `json:"PossessionId"`
-	Count                                       int32 `json:"Count"`
-	SortOrder                                   int32 `json:"SortOrder"`
-}
-
-type CharacterBoardReleaseEffectRow struct {
-	CharacterBoardPanelReleaseEffectGroupId int32 `json:"CharacterBoardPanelReleaseEffectGroupId"`
-	SortOrder                               int32 `json:"SortOrder"`
-	CharacterBoardEffectType                int32 `json:"CharacterBoardEffectType"`
-	CharacterBoardEffectId                  int32 `json:"CharacterBoardEffectId"`
-	EffectValue                             int32 `json:"EffectValue"`
-}
-
-type CharacterBoardRow struct {
-	CharacterBoardId                     int32 `json:"CharacterBoardId"`
-	CharacterBoardGroupId                int32 `json:"CharacterBoardGroupId"`
-	CharacterBoardUnlockConditionGroupId int32 `json:"CharacterBoardUnlockConditionGroupId"`
-	ReleaseRank                          int32 `json:"ReleaseRank"`
-}
-
-type CharacterBoardStatusUpRow struct {
-	CharacterBoardStatusUpId          int32 `json:"CharacterBoardStatusUpId"`
-	CharacterBoardStatusUpType        int32 `json:"CharacterBoardStatusUpType"`
-	CharacterBoardEffectTargetGroupId int32 `json:"CharacterBoardEffectTargetGroupId"`
-}
-
-type CharacterBoardAbilityRow struct {
-	CharacterBoardAbilityId           int32 `json:"CharacterBoardAbilityId"`
-	CharacterBoardEffectTargetGroupId int32 `json:"CharacterBoardEffectTargetGroupId"`
-	AbilityId                         int32 `json:"AbilityId"`
-}
-
-type CharacterBoardAbilityMaxLevelRow struct {
-	CharacterId int32 `json:"CharacterId"`
-	AbilityId   int32 `json:"AbilityId"`
-	MaxLevel    int32 `json:"MaxLevel"`
-}
-
-type CharacterBoardEffectTargetRow struct {
-	CharacterBoardEffectTargetGroupId int32 `json:"CharacterBoardEffectTargetGroupId"`
-	GroupIndex                        int32 `json:"GroupIndex"`
-	CharacterBoardEffectTargetType    int32 `json:"CharacterBoardEffectTargetType"`
-	TargetValue                       int32 `json:"TargetValue"`
-}
-
 type CharacterBoardAssignmentRow struct {
 	CharacterId                  int32 `json:"CharacterId"`
 	CharacterBoardCategoryId     int32 `json:"CharacterBoardCategoryId"`
@@ -83,68 +23,68 @@ type CharacterBoardGroupRow struct {
 }
 
 type CharacterBoardCatalog struct {
-	PanelById               map[int32]CharacterBoardPanelRow
-	PanelsByBoardId         map[int32][]CharacterBoardPanelRow
-	ReleaseCostsByGroupId   map[int32][]CharacterBoardReleasePossessionRow
-	ReleaseEffectsByGroupId map[int32][]CharacterBoardReleaseEffectRow
-	StatusUpById            map[int32]CharacterBoardStatusUpRow
-	AbilityById             map[int32]CharacterBoardAbilityRow
+	PanelById               map[int32]EntityMCharacterBoardPanel
+	PanelsByBoardId         map[int32][]EntityMCharacterBoardPanel
+	ReleaseCostsByGroupId   map[int32][]EntityMCharacterBoardPanelReleasePossessionGroup
+	ReleaseEffectsByGroupId map[int32][]EntityMCharacterBoardPanelReleaseEffectGroup
+	StatusUpById            map[int32]EntityMCharacterBoardStatusUp
+	AbilityById             map[int32]EntityMCharacterBoardAbility
 	AbilityMaxLevel         map[store.CharacterBoardAbilityKey]int32
-	EffectTargetsByGroupId  map[int32][]CharacterBoardEffectTargetRow
-	BoardById               map[int32]CharacterBoardRow
+	EffectTargetsByGroupId  map[int32][]EntityMCharacterBoardEffectTargetGroup
+	BoardById               map[int32]EntityMCharacterBoard
 }
 
 func LoadCharacterBoardCatalog() (*CharacterBoardCatalog, error) {
-	panels, err := utils.ReadJSON[CharacterBoardPanelRow]("EntityMCharacterBoardPanelTable.json")
+	panels, err := utils.ReadTable[EntityMCharacterBoardPanel]("m_character_board_panel")
 	if err != nil {
 		return nil, fmt.Errorf("load character board panel table: %w", err)
 	}
 
-	costs, err := utils.ReadJSON[CharacterBoardReleasePossessionRow]("EntityMCharacterBoardPanelReleasePossessionGroupTable.json")
+	costs, err := utils.ReadTable[EntityMCharacterBoardPanelReleasePossessionGroup]("m_character_board_panel_release_possession_group")
 	if err != nil {
 		return nil, fmt.Errorf("load character board release possession table: %w", err)
 	}
 
-	effects, err := utils.ReadJSON[CharacterBoardReleaseEffectRow]("EntityMCharacterBoardPanelReleaseEffectGroupTable.json")
+	effects, err := utils.ReadTable[EntityMCharacterBoardPanelReleaseEffectGroup]("m_character_board_panel_release_effect_group")
 	if err != nil {
 		return nil, fmt.Errorf("load character board release effect table: %w", err)
 	}
 
-	boards, err := utils.ReadJSON[CharacterBoardRow]("EntityMCharacterBoardTable.json")
+	boards, err := utils.ReadTable[EntityMCharacterBoard]("m_character_board")
 	if err != nil {
 		return nil, fmt.Errorf("load character board table: %w", err)
 	}
 
-	statusUps, err := utils.ReadJSON[CharacterBoardStatusUpRow]("EntityMCharacterBoardStatusUpTable.json")
+	statusUps, err := utils.ReadTable[EntityMCharacterBoardStatusUp]("m_character_board_status_up")
 	if err != nil {
 		return nil, fmt.Errorf("load character board status up table: %w", err)
 	}
 
-	abilities, err := utils.ReadJSON[CharacterBoardAbilityRow]("EntityMCharacterBoardAbilityTable.json")
+	abilities, err := utils.ReadTable[EntityMCharacterBoardAbility]("m_character_board_ability")
 	if err != nil {
 		return nil, fmt.Errorf("load character board ability table: %w", err)
 	}
 
-	abilityMaxLevels, err := utils.ReadJSON[CharacterBoardAbilityMaxLevelRow]("EntityMCharacterBoardAbilityMaxLevelTable.json")
+	abilityMaxLevels, err := utils.ReadTable[EntityMCharacterBoardAbilityMaxLevel]("m_character_board_ability_max_level")
 	if err != nil {
 		return nil, fmt.Errorf("load character board ability max level table: %w", err)
 	}
 
-	targets, err := utils.ReadJSON[CharacterBoardEffectTargetRow]("EntityMCharacterBoardEffectTargetGroupTable.json")
+	targets, err := utils.ReadTable[EntityMCharacterBoardEffectTargetGroup]("m_character_board_effect_target_group")
 	if err != nil {
 		return nil, fmt.Errorf("load character board effect target table: %w", err)
 	}
 
 	catalog := &CharacterBoardCatalog{
-		PanelById:               make(map[int32]CharacterBoardPanelRow, len(panels)),
-		PanelsByBoardId:         make(map[int32][]CharacterBoardPanelRow),
-		ReleaseCostsByGroupId:   make(map[int32][]CharacterBoardReleasePossessionRow),
-		ReleaseEffectsByGroupId: make(map[int32][]CharacterBoardReleaseEffectRow),
-		StatusUpById:            make(map[int32]CharacterBoardStatusUpRow, len(statusUps)),
-		AbilityById:             make(map[int32]CharacterBoardAbilityRow, len(abilities)),
+		PanelById:               make(map[int32]EntityMCharacterBoardPanel, len(panels)),
+		PanelsByBoardId:         make(map[int32][]EntityMCharacterBoardPanel),
+		ReleaseCostsByGroupId:   make(map[int32][]EntityMCharacterBoardPanelReleasePossessionGroup),
+		ReleaseEffectsByGroupId: make(map[int32][]EntityMCharacterBoardPanelReleaseEffectGroup),
+		StatusUpById:            make(map[int32]EntityMCharacterBoardStatusUp, len(statusUps)),
+		AbilityById:             make(map[int32]EntityMCharacterBoardAbility, len(abilities)),
 		AbilityMaxLevel:         make(map[store.CharacterBoardAbilityKey]int32, len(abilityMaxLevels)),
-		EffectTargetsByGroupId:  make(map[int32][]CharacterBoardEffectTargetRow),
-		BoardById:               make(map[int32]CharacterBoardRow, len(boards)),
+		EffectTargetsByGroupId:  make(map[int32][]EntityMCharacterBoardEffectTargetGroup),
+		BoardById:               make(map[int32]EntityMCharacterBoard, len(boards)),
 	}
 
 	for _, p := range panels {

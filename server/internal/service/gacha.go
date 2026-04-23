@@ -12,24 +12,10 @@ import (
 	"lunar-tear/server/internal/model"
 	"lunar-tear/server/internal/schedule"
 	"lunar-tear/server/internal/store"
-	"lunar-tear/server/internal/userdata"
 
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
-
-var gachaDiffTables = []string{
-	"IUserGem",
-	"IUserCostume",
-	"IUserWeapon",
-	"IUserConsumableItem",
-	"IUserCostumeActiveSkill",
-	"IUserWeaponNote",
-	"IUserWeaponSkill",
-	"IUserWeaponAbility",
-	"IUserCharacter",
-	"IUserMaterial",
-}
 
 type GachaServiceServer struct {
 	pb.UnimplementedGachaServiceServer
@@ -57,7 +43,7 @@ func (s *GachaServiceServer) GetGachaList(ctx context.Context, req *pb.GetGachaL
 	log.Printf("[GachaService] GetGachaList: labels=%v", req.GachaLabelType)
 
 	catalog := s.scheduleManager.GachaEntries()
-	userId := currentUserId(ctx, s.users, s.sessions)
+	userId := CurrentUserId(ctx, s.users, s.sessions)
 	nowMillis := gametime.NowMillis()
 
 	user, err := s.users.UpdateUser(userId, func(user *store.UserState) {
@@ -83,7 +69,6 @@ func (s *GachaServiceServer) GetGachaList(ctx context.Context, req *pb.GetGachaL
 	return &pb.GetGachaListResponse{
 		Gacha:               gachaList,
 		ConvertedGachaMedal: toProtoConvertedGachaMedal(user.Gacha.ConvertedGachaMedal),
-		DiffUserData:        userdata.EmptyDiff(),
 	}, nil
 }
 
@@ -135,7 +120,7 @@ func (s *GachaServiceServer) GetGacha(ctx context.Context, req *pb.GetGachaReque
 
 	catalog := s.scheduleManager.GachaEntries()
 
-	userId := currentUserId(ctx, s.users, s.sessions)
+	userId := CurrentUserId(ctx, s.users, s.sessions)
 	user, err := s.users.LoadUser(userId)
 	if err != nil {
 		return nil, fmt.Errorf("snapshot user: %w", err)
@@ -153,8 +138,7 @@ func (s *GachaServiceServer) GetGacha(ctx context.Context, req *pb.GetGachaReque
 	}
 
 	return &pb.GetGachaResponse{
-		Gacha:        byId,
-		DiffUserData: userdata.EmptyDiff(),
+		Gacha: byId,
 	}, nil
 }
 
@@ -166,7 +150,7 @@ func (s *GachaServiceServer) Draw(ctx context.Context, req *pb.DrawRequest) (*pb
 		return nil, fmt.Errorf("gacha %d not found", req.GachaId)
 	}
 
-	userId := currentUserId(ctx, s.users, s.sessions)
+	userId := CurrentUserId(ctx, s.users, s.sessions)
 	execCount := req.ExecCount
 	if execCount <= 0 {
 		execCount = 1
@@ -291,17 +275,11 @@ func (s *GachaServiceServer) Draw(ctx context.Context, req *pb.DrawRequest) (*pb
 	bs := updatedUser.Gacha.BannerStates[entry.GachaId]
 	nextGacha := toProtoGacha(*entry, &bs)
 
-	changedStoryIds := s.handler.Granter.DrainChangedStoryWeaponIds()
-	diffOrder := append(gachaDiffTables, "IUserWeaponStory")
-	diff := userdata.BuildDiffFromTablesOrdered(userdata.ProjectTables(updatedUser, diffOrder), diffOrder)
-	userdata.AddWeaponStoryDiff(diff, updatedUser, changedStoryIds)
-
 	return &pb.DrawResponse{
 		NextGacha:          nextGacha,
 		GachaResult:        gachaResults,
 		GachaBonus:         bonuses,
 		MenuGachaBadgeInfo: []*pb.MenuGachaBadgeInfo{},
-		DiffUserData:       diff,
 	}, nil
 }
 
@@ -313,7 +291,7 @@ func (s *GachaServiceServer) ResetBoxGacha(ctx context.Context, req *pb.ResetBox
 		return nil, fmt.Errorf("gacha %d not found", req.GachaId)
 	}
 
-	userId := currentUserId(ctx, s.users, s.sessions)
+	userId := CurrentUserId(ctx, s.users, s.sessions)
 	updatedUser, err := s.users.UpdateUser(userId, func(user *store.UserState) {
 		if resetErr := s.handler.HandleResetBox(user, *entry); resetErr != nil {
 			log.Printf("[GachaService] ResetBoxGacha error: %v", resetErr)
@@ -326,14 +304,13 @@ func (s *GachaServiceServer) ResetBoxGacha(ctx context.Context, req *pb.ResetBox
 	bs := updatedUser.Gacha.BannerStates[entry.GachaId]
 
 	return &pb.ResetBoxGachaResponse{
-		Gacha:        toProtoGacha(*entry, &bs),
-		DiffUserData: userdata.EmptyDiff(),
+		Gacha: toProtoGacha(*entry, &bs),
 	}, nil
 }
 
 func (s *GachaServiceServer) GetRewardGacha(ctx context.Context, req *emptypb.Empty) (*pb.GetRewardGachaResponse, error) {
 	log.Printf("[GachaService] GetRewardGacha")
-	userId := currentUserId(ctx, s.users, s.sessions)
+	userId := CurrentUserId(ctx, s.users, s.sessions)
 	user, err := s.users.LoadUser(userId)
 	if err != nil {
 		return nil, fmt.Errorf("snapshot user: %w", err)
@@ -354,14 +331,13 @@ func (s *GachaServiceServer) GetRewardGacha(ctx context.Context, req *emptypb.Em
 		Available:              drawCount < maxCount,
 		TodaysCurrentDrawCount: drawCount,
 		DailyMaxCount:          maxCount,
-		DiffUserData:           userdata.EmptyDiff(),
 	}, nil
 }
 
 func (s *GachaServiceServer) RewardDraw(ctx context.Context, req *pb.RewardDrawRequest) (*pb.RewardDrawResponse, error) {
 	log.Printf("[GachaService] RewardDraw: placement=%q reward=%q amount=%q", req.PlacementName, req.RewardName, req.RewardAmount)
 
-	userId := currentUserId(ctx, s.users, s.sessions)
+	userId := CurrentUserId(ctx, s.users, s.sessions)
 
 	var items []gacha.DrawnItem
 	updatedUser, err := s.users.UpdateUser(userId, func(user *store.UserState) {
@@ -394,12 +370,8 @@ func (s *GachaServiceServer) RewardDraw(ctx context.Context, req *pb.RewardDrawR
 		})
 	}
 
-	tables := userdata.FullClientTableMap(updatedUser)
-	diff := userdata.BuildDiffFromTables(tables)
-
 	return &pb.RewardDrawResponse{
 		RewardGachaResult: results,
-		DiffUserData:      diff,
 	}, nil
 }
 

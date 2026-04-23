@@ -5,11 +5,12 @@ import (
 
 	"lunar-tear/server/internal/gametime"
 	"lunar-tear/server/internal/store"
+	"lunar-tear/server/internal/utils"
 )
 
 func init() {
 	register("IUser", func(user store.UserState) string {
-		s, _ := encodeJSONMaps(map[string]any{
+		s, _ := utils.EncodeJSONMaps(map[string]any{
 			"userId":              user.UserId,
 			"playerId":            user.PlayerId,
 			"osType":              user.OsType,
@@ -22,15 +23,15 @@ func init() {
 		return s
 	})
 	register("IUserSetting", func(user store.UserState) string {
-		s, _ := encodeJSONRecords(&EntityIUserSetting{
-			UserId:                user.UserId,
-			IsNotifyPurchaseAlert: user.Setting.IsNotifyPurchaseAlert,
-			LatestVersion:         user.Setting.LatestVersion,
+		s, _ := utils.EncodeJSONMaps(map[string]any{
+			"userId":                user.UserId,
+			"isNotifyPurchaseAlert": user.Setting.IsNotifyPurchaseAlert,
+			"latestVersion":         user.Setting.LatestVersion,
 		})
 		return s
 	})
 	register("IUserStatus", func(user store.UserState) string {
-		s, _ := encodeJSONMaps(map[string]any{
+		s, _ := utils.EncodeJSONMaps(map[string]any{
 			"userId":                user.UserId,
 			"level":                 user.Status.Level,
 			"exp":                   user.Status.Exp,
@@ -41,16 +42,16 @@ func init() {
 		return s
 	})
 	register("IUserGem", func(user store.UserState) string {
-		s, _ := encodeJSONRecords(&EntityIUserGem{
-			UserId:        user.UserId,
-			PaidGem:       user.Gem.PaidGem,
-			FreeGem:       user.Gem.FreeGem,
-			LatestVersion: gametime.NowMillis(),
+		s, _ := utils.EncodeJSONMaps(map[string]any{
+			"userId":        user.UserId,
+			"paidGem":       user.Gem.PaidGem,
+			"freeGem":       user.Gem.FreeGem,
+			"latestVersion": gametime.NowMillis(),
 		})
 		return s
 	})
 	register("IUserProfile", func(user store.UserState) string {
-		s, _ := encodeJSONMaps(map[string]any{
+		s, _ := utils.EncodeJSONMaps(map[string]any{
 			"userId":                          user.UserId,
 			"name":                            user.Profile.Name,
 			"nameUpdateDatetime":              user.Profile.NameUpdateDatetime,
@@ -63,58 +64,58 @@ func init() {
 		return s
 	})
 	register("IUserLogin", func(user store.UserState) string {
-		s, _ := encodeJSONRecords(&EntityIUserLogin{
-			UserId:                    user.UserId,
-			TotalLoginCount:           user.Login.TotalLoginCount,
-			ContinualLoginCount:       user.Login.ContinualLoginCount,
-			MaxContinualLoginCount:    user.Login.MaxContinualLoginCount,
-			LastLoginDatetime:         user.Login.LastLoginDatetime,
-			LastComebackLoginDatetime: user.Login.LastComebackLoginDatetime,
-			LatestVersion:             user.Login.LatestVersion,
+		s, _ := utils.EncodeJSONMaps(map[string]any{
+			"userId":                    user.UserId,
+			"totalLoginCount":           user.Login.TotalLoginCount,
+			"continualLoginCount":       user.Login.ContinualLoginCount,
+			"maxContinualLoginCount":    user.Login.MaxContinualLoginCount,
+			"lastLoginDatetime":         user.Login.LastLoginDatetime,
+			"lastComebackLoginDatetime": user.Login.LastComebackLoginDatetime,
+			"latestVersion":             user.Login.LatestVersion,
 		})
 		return s
 	})
 	register("IUserLoginBonus", func(user store.UserState) string {
-		s, _ := encodeJSONRecords(&EntityIUserLoginBonus{
-			UserId:                      user.UserId,
-			LoginBonusId:                user.LoginBonus.LoginBonusId,
-			CurrentPageNumber:           user.LoginBonus.CurrentPageNumber,
-			CurrentStampNumber:          user.LoginBonus.CurrentStampNumber,
-			LatestRewardReceiveDatetime: user.LoginBonus.LatestRewardReceiveDatetime,
-			LatestVersion:               user.LoginBonus.LatestVersion,
+		s, _ := utils.EncodeJSONMaps(map[string]any{
+			"userId":                      user.UserId,
+			"loginBonusId":                user.LoginBonus.LoginBonusId,
+			"currentPageNumber":           user.LoginBonus.CurrentPageNumber,
+			"currentStampNumber":          user.LoginBonus.CurrentStampNumber,
+			"latestRewardReceiveDatetime": user.LoginBonus.LatestRewardReceiveDatetime,
+			"latestVersion":               user.LoginBonus.LatestVersion,
 		})
 		return s
 	})
 	register("IUserTutorialProgress", func(user store.UserState) string {
-		s, _ := encodeJSONMaps(sortedTutorialRecords(user)...)
+		s, _ := utils.EncodeJSONMaps(sortedTutorialRecords(user)...)
 		return s
 	})
 	register("IUserMission", func(user store.UserState) string {
-		s, _ := encodeJSONMaps(sortedMissionRecords(user)...)
+		s, _ := utils.EncodeJSONMaps(sortedMissionRecords(user)...)
 		return s
 	})
 	register("IUserNaviCutIn", func(user store.UserState) string {
-		s, _ := encodeJSONMaps(sortedNaviCutInRecords(user)...)
+		s, _ := utils.EncodeJSONMaps(sortedNaviCutInRecords(user)...)
 		return s
 	})
 	register("IUserMovie", func(user store.UserState) string {
-		s, _ := encodeJSONMaps(sortedMovieRecords(user)...)
+		s, _ := utils.EncodeJSONMaps(sortedMovieRecords(user)...)
 		return s
 	})
 	register("IUserContentsStory", func(user store.UserState) string {
-		s, _ := encodeJSONMaps(sortedContentsStoryRecords(user)...)
+		s, _ := utils.EncodeJSONMaps(sortedContentsStoryRecords(user)...)
 		return s
 	})
 	register("IUserOmikuji", func(user store.UserState) string {
-		s, _ := encodeJSONMaps(sortedOmikujiRecords(user)...)
+		s, _ := utils.EncodeJSONMaps(sortedOmikujiRecords(user)...)
 		return s
 	})
 	register("IUserDokan", func(user store.UserState) string {
-		s, _ := encodeJSONMaps(sortedDokanRecords(user)...)
+		s, _ := utils.EncodeJSONMaps(sortedDokanRecords(user)...)
 		return s
 	})
 	register("IUserPortalCageStatus", func(user store.UserState) string {
-		s, _ := encodeJSONMaps(map[string]any{
+		s, _ := utils.EncodeJSONMaps(map[string]any{
 			"userId":                user.UserId,
 			"isCurrentProgress":     user.PortalCageStatus.IsCurrentProgress,
 			"dropItemStartDatetime": user.PortalCageStatus.DropItemStartDatetime,
@@ -124,7 +125,7 @@ func init() {
 		return s
 	})
 	register("IUserEventQuestGuerrillaFreeOpen", func(user store.UserState) string {
-		s, _ := encodeJSONMaps(map[string]any{
+		s, _ := utils.EncodeJSONMaps(map[string]any{
 			"userId":           user.UserId,
 			"startDatetime":    user.GuerrillaFreeOpen.StartDatetime,
 			"openMinutes":      user.GuerrillaFreeOpen.OpenMinutes,
@@ -135,11 +136,11 @@ func init() {
 	})
 
 	register("IUserShopItem", func(user store.UserState) string {
-		s, _ := encodeJSONMaps(sortedShopItemRecords(user)...)
+		s, _ := utils.EncodeJSONMaps(sortedShopItemRecords(user)...)
 		return s
 	})
 	register("IUserShopReplaceable", func(user store.UserState) string {
-		s, _ := encodeJSONMaps(map[string]any{
+		s, _ := utils.EncodeJSONMaps(map[string]any{
 			"userId":                     user.UserId,
 			"lineupUpdateCount":          user.ShopReplaceable.LineupUpdateCount,
 			"latestLineupUpdateDatetime": user.ShopReplaceable.LatestLineupUpdateDatetime,
@@ -148,11 +149,26 @@ func init() {
 		return s
 	})
 	register("IUserShopReplaceableLineup", func(user store.UserState) string {
-		s, _ := encodeJSONMaps(sortedShopReplaceableLineupRecords(user)...)
+		s, _ := utils.EncodeJSONMaps(sortedShopReplaceableLineupRecords(user)...)
 		return s
 	})
 
-	registerStatic()
+	register("IUserFacebook", func(user store.UserState) string {
+		return ProjectFacebook(user.UserId, user.FacebookId)
+	})
+	registerStatic("IUserApple")
+}
+
+func ProjectFacebook(userId int64, facebookId int64) string {
+	if facebookId == 0 {
+		return "[]"
+	}
+	s, _ := utils.EncodeJSONMaps(map[string]any{
+		"userId":        userId,
+		"facebookId":    facebookId,
+		"latestVersion": gametime.NowMillis(),
+	})
+	return s
 }
 
 func sortedTutorialRecords(user store.UserState) []map[string]any {

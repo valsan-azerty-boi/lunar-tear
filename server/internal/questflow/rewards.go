@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/google/uuid"
-
 	"lunar-tear/server/internal/gameutil"
 	"lunar-tear/server/internal/masterdata"
 	"lunar-tear/server/internal/model"
@@ -20,10 +18,10 @@ func (h *QuestHandler) isQuestCleared(user *store.UserState, questId int32) bool
 	return quest.QuestStateType == model.UserQuestStateTypeCleared
 }
 
-func appendMissionRewards(dst []RewardGrant, src []masterdata.QuestMissionRewardRow) []RewardGrant {
+func appendMissionRewards(dst []RewardGrant, src []masterdata.EntityMQuestMissionReward) []RewardGrant {
 	for _, r := range src {
 		dst = append(dst, RewardGrant{
-			PossessionType: r.PossessionType,
+			PossessionType: model.PossessionType(r.PossessionType),
 			PossessionId:   r.PossessionId,
 			Count:          r.Count,
 		})
@@ -31,7 +29,7 @@ func appendMissionRewards(dst []RewardGrant, src []masterdata.QuestMissionReward
 	return dst
 }
 
-func (h *QuestHandler) firstClearRewardGroupId(user *store.UserState, questDef masterdata.QuestRow) int32 {
+func (h *QuestHandler) firstClearRewardGroupId(user *store.UserState, questDef masterdata.EntityMQuest) int32 {
 	rewardGroupId := questDef.QuestFirstClearRewardGroupId
 	for _, switchRow := range h.FirstClearRewardSwitchesByQuestId[questDef.QuestId] {
 		if h.isQuestCleared(user, switchRow.SwitchConditionClearQuestId) {
@@ -57,7 +55,7 @@ func (h *QuestHandler) evaluateFinishOutcome(user *store.UserState, questId int3
 		rewardGroupId := h.firstClearRewardGroupId(user, questDef)
 		for _, reward := range h.FirstClearRewardsByGroupId[rewardGroupId] {
 			outcome.FirstClearRewards = append(outcome.FirstClearRewards, RewardGrant{
-				PossessionType: reward.PossessionType,
+				PossessionType: model.PossessionType(reward.PossessionType),
 				PossessionId:   reward.PossessionId,
 				Count:          reward.Count,
 			})
@@ -67,7 +65,7 @@ func (h *QuestHandler) evaluateFinishOutcome(user *store.UserState, questId int3
 	if user.MainQuest.CurrentQuestFlowType == int32(model.QuestFlowTypeReplayFlow) && questDef.QuestReplayFlowRewardGroupId > 0 {
 		for _, reward := range h.ReplayFlowRewardsByGroupId[questDef.QuestReplayFlowRewardGroupId] {
 			outcome.ReplayFlowFirstClearRewards = append(outcome.ReplayFlowFirstClearRewards, RewardGrant{
-				PossessionType: reward.PossessionType,
+				PossessionType: model.PossessionType(reward.PossessionType),
 				PossessionId:   reward.PossessionId,
 				Count:          reward.Count,
 			})
@@ -78,7 +76,7 @@ func (h *QuestHandler) evaluateFinishOutcome(user *store.UserState, questId int3
 	regularMissionCount := 0
 	for _, questMissionId := range h.MissionIdsByQuestId[questId] {
 		missionDef, ok := h.MissionById[questMissionId]
-		if !ok || missionDef.QuestMissionConditionType == model.QuestMissionConditionTypeComplete {
+		if !ok || model.QuestMissionConditionType(missionDef.QuestMissionConditionType) == model.QuestMissionConditionTypeComplete {
 			continue
 		}
 		regularMissionCount++
@@ -103,7 +101,7 @@ func (h *QuestHandler) evaluateFinishOutcome(user *store.UserState, questId int3
 	if allRegularWillClear {
 		for _, questMissionId := range h.MissionIdsByQuestId[questId] {
 			missionDef, ok := h.MissionById[questMissionId]
-			if !ok || missionDef.QuestMissionConditionType != model.QuestMissionConditionTypeComplete {
+			if !ok || model.QuestMissionConditionType(missionDef.QuestMissionConditionType) != model.QuestMissionConditionTypeComplete {
 				continue
 			}
 			key := store.QuestMissionKey{QuestId: questId, QuestMissionId: questMissionId}
@@ -122,7 +120,7 @@ func (h *QuestHandler) evaluateFinishOutcome(user *store.UserState, questId int3
 	return outcome
 }
 
-func (h *QuestHandler) computeDropRewards(questDef masterdata.QuestRow) []RewardGrant {
+func (h *QuestHandler) computeDropRewards(questDef masterdata.EntityMQuest) []RewardGrant {
 	if questDef.QuestPickupRewardGroupId == 0 {
 		return nil
 	}
@@ -130,7 +128,7 @@ func (h *QuestHandler) computeDropRewards(questDef masterdata.QuestRow) []Reward
 	for _, dropId := range h.PickupRewardIdsByGroupId[questDef.QuestPickupRewardGroupId] {
 		if bdr, ok := h.BattleDropRewardById[dropId]; ok {
 			drops = append(drops, RewardGrant{
-				PossessionType: bdr.PossessionType,
+				PossessionType: model.PossessionType(bdr.PossessionType),
 				PossessionId:   bdr.PossessionId,
 				Count:          bdr.Count,
 			})
@@ -257,65 +255,12 @@ func (h *QuestHandler) applyQuestRewards(user *store.UserState, questId int32, n
 
 	rewardGroupId := h.firstClearRewardGroupId(user, questDef)
 	for _, reward := range h.FirstClearRewardsByGroupId[rewardGroupId] {
-		h.applyRewardPossession(user, reward.PossessionType, reward.PossessionId, reward.Count, nowMillis)
+		h.applyRewardPossession(user, model.PossessionType(reward.PossessionType), reward.PossessionId, reward.Count, nowMillis)
 	}
 }
 
 func (h *QuestHandler) applyRewardPossession(user *store.UserState, possType model.PossessionType, possId, count int32, nowMillis int64) {
-	switch possType {
-	case model.PossessionTypeCompanion:
-		h.grantCompanion(user, possId, nowMillis)
-	case model.PossessionTypeParts:
-		h.grantParts(user, possId, nowMillis)
-	default:
-		h.Granter.GrantFull(user, possType, possId, count, nowMillis)
-	}
-}
-
-func (h *QuestHandler) grantCompanion(user *store.UserState, companionId int32, nowMillis int64) {
-	for _, row := range user.Companions {
-		if row.CompanionId == companionId {
-			return
-		}
-	}
-	key := uuid.New().String()
-	user.Companions[key] = store.CompanionState{
-		UserCompanionUuid:   key,
-		CompanionId:         companionId,
-		Level:               1,
-		HeadupDisplayViewId: 1,
-		AcquisitionDatetime: nowMillis,
-	}
-}
-
-func (h *QuestHandler) grantParts(user *store.UserState, partsId int32, nowMillis int64) {
-	for _, row := range user.Parts {
-		if row.PartsId == partsId {
-			return
-		}
-	}
-
-	var mainStatId int32
-	if partsDef, ok := h.PartsById[partsId]; ok {
-		mainStatId = h.DefaultPartsStatusMainByLotteryGroup[partsDef.PartsStatusMainLotteryGroupId]
-
-		if _, exists := user.PartsGroupNotes[partsDef.PartsGroupId]; !exists {
-			user.PartsGroupNotes[partsDef.PartsGroupId] = store.PartsGroupNoteState{
-				PartsGroupId:             partsDef.PartsGroupId,
-				FirstAcquisitionDatetime: nowMillis,
-				LatestVersion:            nowMillis,
-			}
-		}
-	}
-
-	key := uuid.New().String()
-	user.Parts[key] = store.PartsState{
-		UserPartsUuid:       key,
-		PartsId:             partsId,
-		Level:               1,
-		PartsStatusMainId:   mainStatId,
-		AcquisitionDatetime: nowMillis,
-	}
+	h.Granter.GrantFull(user, possType, possId, count, nowMillis)
 }
 
 func (h *QuestHandler) grantWeaponStoryUnlock(user *store.UserState, weaponId, storyIndex int32, nowMillis int64) bool {
@@ -344,7 +289,7 @@ func (h *QuestHandler) applyCompanionTutorialReward(user *store.UserState, choic
 		log.Printf("[QuestHandler] unknown companion tutorial choiceId=%d", choiceId)
 		return nil
 	}
-	h.grantCompanion(user, companionId, nowMillis)
+	h.Granter.GrantCompanion(user, companionId, nowMillis)
 	return []RewardGrant{{
 		PossessionType: model.PossessionTypeCompanion,
 		PossessionId:   companionId,
@@ -365,7 +310,7 @@ func (h *QuestHandler) grantWeaponStoryUnlocksForQuestScene(user *store.UserStat
 		}
 		rewardGroupId := h.firstClearRewardGroupId(user, questDef)
 		for _, reward := range h.FirstClearRewardsByGroupId[rewardGroupId] {
-			if reward.PossessionType != model.PossessionTypeWeapon {
+			if model.PossessionType(reward.PossessionType) != model.PossessionTypeWeapon {
 				continue
 			}
 			weaponId := reward.PossessionId
@@ -375,7 +320,7 @@ func (h *QuestHandler) grantWeaponStoryUnlocksForQuestScene(user *store.UserStat
 			}
 			groupId := weapon.WeaponStoryReleaseConditionGroupId
 			for _, cond := range h.ReleaseConditionsByGroupId[groupId] {
-				if cond.WeaponStoryReleaseConditionType == model.WeaponStoryReleaseConditionTypeAcquisition && cond.ConditionValue == 0 {
+				if model.WeaponStoryReleaseConditionType(cond.WeaponStoryReleaseConditionType) == model.WeaponStoryReleaseConditionTypeAcquisition && cond.ConditionValue == 0 {
 					if h.grantWeaponStoryUnlock(user, weaponId, cond.StoryIndex, nowMillis) {
 						changedIds = append(changedIds, weaponId)
 					}
@@ -387,7 +332,7 @@ func (h *QuestHandler) grantWeaponStoryUnlocksForQuestScene(user *store.UserStat
 	if resultType == model.QuestResultTypeFullResult {
 		for groupId, conditions := range h.ReleaseConditionsByGroupId {
 			for _, cond := range conditions {
-				if cond.WeaponStoryReleaseConditionType == model.WeaponStoryReleaseConditionTypeQuestClear && cond.ConditionValue == questId {
+				if model.WeaponStoryReleaseConditionType(cond.WeaponStoryReleaseConditionType) == model.WeaponStoryReleaseConditionTypeQuestClear && cond.ConditionValue == questId {
 					for _, weaponId := range h.WeaponIdsByReleaseConditionGroupId[groupId] {
 						if h.grantWeaponStoryUnlock(user, weaponId, cond.StoryIndex, nowMillis) {
 							changedIds = append(changedIds, weaponId)

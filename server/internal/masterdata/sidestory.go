@@ -5,18 +5,12 @@ import (
 	"lunar-tear/server/internal/utils"
 )
 
-type sideStorySceneRow struct {
-	SideStoryQuestId      int32 `json:"SideStoryQuestId"`
-	SideStoryQuestSceneId int32 `json:"SideStoryQuestSceneId"`
-	SortOrder             int32 `json:"SortOrder"`
-}
-
 type SideStoryCatalog struct {
 	FirstSceneByQuestId map[int32]int32
 }
 
 func LoadSideStoryCatalog() *SideStoryCatalog {
-	scenes, err := utils.ReadJSON[sideStorySceneRow]("EntityMSideStoryQuestSceneTable.json")
+	scenes, err := utils.ReadTable[EntityMSideStoryQuestScene]("m_side_story_quest_scene")
 	if err != nil {
 		log.Fatalf("load side story quest scene table: %v", err)
 	}

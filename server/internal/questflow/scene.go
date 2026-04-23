@@ -15,7 +15,7 @@ func (h *QuestHandler) applySceneGrants(user *store.UserState, questSceneId int3
 		return
 	}
 	for _, g := range grants {
-		h.applyRewardPossession(user, g.PossessionType, g.PossessionId, g.Count, nowMillis)
+		h.applyRewardPossession(user, model.PossessionType(g.PossessionType), g.PossessionId, g.Count, nowMillis)
 	}
 }
 
@@ -123,7 +123,7 @@ func (h *QuestHandler) HandleMainQuestSceneProgress(user *store.UserState, quest
 	}
 
 	if isMainQuestPlayable(quest) {
-		if scene.QuestResultType == model.QuestResultTypeHalfResult {
+		if model.QuestResultType(scene.QuestResultType) == model.QuestResultTypeHalfResult {
 			nowMillis := gametime.NowMillis()
 			h.clearQuestMissions(user, quest.QuestId, nowMillis)
 		}

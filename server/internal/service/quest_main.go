@@ -9,7 +9,6 @@ import (
 	"lunar-tear/server/internal/model"
 	"lunar-tear/server/internal/questflow"
 	"lunar-tear/server/internal/store"
-	"lunar-tear/server/internal/userdata"
 
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
@@ -28,91 +27,45 @@ func NewQuestServiceServer(users store.UserRepository, sessions store.SessionRep
 	return &QuestServiceServer{users: users, sessions: sessions, engine: engine}
 }
 
-func buildSelectedQuestDiff(user store.UserState, tableNames []string) map[string]*pb.DiffData {
-	tables := userdata.ProjectTables(user, tableNames)
-	return userdata.BuildDiffFromTablesOrdered(tables, tableNames)
-}
-
 func (s *QuestServiceServer) UpdateMainFlowSceneProgress(ctx context.Context, req *pb.UpdateMainFlowSceneProgressRequest) (*pb.UpdateMainFlowSceneProgressResponse, error) {
 	log.Printf("[QuestService] UpdateMainFlowSceneProgress: questSceneId=%d", req.QuestSceneId)
 
-	userId := currentUserId(ctx, s.users, s.sessions)
-	user, _ := s.users.UpdateUser(userId, func(user *store.UserState) {
+	userId := CurrentUserId(ctx, s.users, s.sessions)
+	s.users.UpdateUser(userId, func(user *store.UserState) {
 		s.engine.HandleMainFlowSceneProgress(user, req.QuestSceneId, gametime.NowMillis())
 	})
 
-	diff := buildSelectedQuestDiff(user, []string{
-		"IUserMainQuestFlowStatus",
-		"IUserMainQuestMainFlowStatus",
-		"IUserMainQuestProgressStatus",
-		"IUserMainQuestSeasonRoute",
-		"IUserPortalCageStatus",
-		"IUserSideStoryQuestSceneProgressStatus",
-		"IUserQuest",
-		"IUserCharacter",
-		"IUserCostume",
-		"IUserCostumeActiveSkill",
-		"IUserWeapon",
-		"IUserWeaponSkill",
-		"IUserWeaponAbility",
-		"IUserWeaponNote",
-		"IUserCompanion",
-		"IUserConsumableItem",
-		"IUserMaterial",
-		"IUserImportantItem",
-		"IUserParts",
-		"IUserPartsGroupNote",
-	})
-	userdata.AddWeaponStoryDiff(diff, user, s.engine.Granter.DrainChangedStoryWeaponIds())
-
-	return &pb.UpdateMainFlowSceneProgressResponse{
-		DiffUserData: diff,
-	}, nil
+	return &pb.UpdateMainFlowSceneProgressResponse{}, nil
 }
 
 func (s *QuestServiceServer) UpdateReplayFlowSceneProgress(ctx context.Context, req *pb.UpdateReplayFlowSceneProgressRequest) (*pb.UpdateReplayFlowSceneProgressResponse, error) {
 	log.Printf("[QuestService] UpdateReplayFlowSceneProgress: questSceneId=%d", req.QuestSceneId)
 
-	userId := currentUserId(ctx, s.users, s.sessions)
-	user, _ := s.users.UpdateUser(userId, func(user *store.UserState) {
+	userId := CurrentUserId(ctx, s.users, s.sessions)
+	s.users.UpdateUser(userId, func(user *store.UserState) {
 		s.engine.HandleReplayFlowSceneProgress(user, req.QuestSceneId, gametime.NowMillis())
 	})
 
-	return &pb.UpdateReplayFlowSceneProgressResponse{
-		DiffUserData: buildSelectedQuestDiff(user, []string{
-			"IUserMainQuestFlowStatus",
-			"IUserMainQuestReplayFlowStatus",
-		}),
-	}, nil
+	return &pb.UpdateReplayFlowSceneProgressResponse{}, nil
 }
 
 func (s *QuestServiceServer) UpdateMainQuestSceneProgress(ctx context.Context, req *pb.UpdateMainQuestSceneProgressRequest) (*pb.UpdateMainQuestSceneProgressResponse, error) {
 	log.Printf("[QuestService] UpdateMainQuestSceneProgress: questSceneId=%d", req.QuestSceneId)
 
-	userId := currentUserId(ctx, s.users, s.sessions)
-	user, _ := s.users.UpdateUser(userId, func(user *store.UserState) {
+	userId := CurrentUserId(ctx, s.users, s.sessions)
+	s.users.UpdateUser(userId, func(user *store.UserState) {
 		s.engine.HandleMainQuestSceneProgress(user, req.QuestSceneId)
 	})
 
-	return &pb.UpdateMainQuestSceneProgressResponse{
-		DiffUserData: buildSelectedQuestDiff(user, []string{
-			"IUserStatus",
-			"IUserCharacter",
-			"IUserQuest",
-			"IUserQuestMission",
-			"IUserMainQuestFlowStatus",
-			"IUserMainQuestMainFlowStatus",
-			"IUserMainQuestProgressStatus",
-		}),
-	}, nil
+	return &pb.UpdateMainQuestSceneProgressResponse{}, nil
 }
 
 func (s *QuestServiceServer) StartMainQuest(ctx context.Context, req *pb.StartMainQuestRequest) (*pb.StartMainQuestResponse, error) {
 	log.Printf("[QuestService] StartMainQuest: %+v", req)
 
-	userId := currentUserId(ctx, s.users, s.sessions)
+	userId := CurrentUserId(ctx, s.users, s.sessions)
 	nowMillis := gametime.NowMillis()
-	user, _ := s.users.UpdateUser(userId, func(user *store.UserState) {
+	s.users.UpdateUser(userId, func(user *store.UserState) {
 		if req.IsReplayFlow {
 			s.engine.HandleQuestStartReplay(user, req.QuestId, req.IsBattleOnly, req.UserDeckNumber, nowMillis)
 		} else {
@@ -132,16 +85,6 @@ func (s *QuestServiceServer) StartMainQuest(ctx context.Context, req *pb.StartMa
 
 	return &pb.StartMainQuestResponse{
 		BattleDropReward: pbDrops,
-		DiffUserData: buildSelectedQuestDiff(user, []string{
-			"IUserStatus",
-			"IUserQuest",
-			"IUserQuestMission",
-			"IUserMainQuestFlowStatus",
-			"IUserMainQuestMainFlowStatus",
-			"IUserMainQuestProgressStatus",
-			"IUserMainQuestSeasonRoute",
-			"IUserMainQuestReplayFlowStatus",
-		}),
 	}, nil
 }
 
@@ -165,37 +108,11 @@ func (s *QuestServiceServer) FinishMainQuest(ctx context.Context, req *pb.Finish
 		req.QuestId, req.IsMainFlow, req.IsRetired, req.IsAnnihilated, req.StorySkipType)
 
 	nowMillis := gametime.NowMillis()
-	userId := currentUserId(ctx, s.users, s.sessions)
+	userId := CurrentUserId(ctx, s.users, s.sessions)
 	var outcome questflow.FinishOutcome
-	user, _ := s.users.UpdateUser(userId, func(user *store.UserState) {
+	s.users.UpdateUser(userId, func(user *store.UserState) {
 		outcome = s.engine.HandleQuestFinish(user, req.QuestId, req.IsRetired, req.IsAnnihilated, nowMillis)
 	})
-
-	diff := buildSelectedQuestDiff(user, []string{
-		"IUserQuest",
-		"IUserQuestMission",
-		"IUserMainQuestFlowStatus",
-		"IUserMainQuestMainFlowStatus",
-		"IUserMainQuestProgressStatus",
-		"IUserMainQuestSeasonRoute",
-		"IUserMainQuestReplayFlowStatus",
-		"IUserStatus",
-		"IUserGem",
-		"IUserCharacter",
-		"IUserCostume",
-		"IUserCostumeActiveSkill",
-		"IUserWeapon",
-		"IUserWeaponSkill",
-		"IUserWeaponAbility",
-		"IUserWeaponNote",
-		"IUserCompanion",
-		"IUserConsumableItem",
-		"IUserMaterial",
-		"IUserImportantItem",
-		"IUserParts",
-		"IUserPartsGroupNote",
-	})
-	userdata.AddWeaponStoryDiff(diff, user, outcome.ChangedWeaponStoryIds)
 
 	return &pb.FinishMainQuestResponse{
 		DropReward:                      toProtoRewards(outcome.DropRewards),
@@ -207,16 +124,17 @@ func (s *QuestServiceServer) FinishMainQuest(ctx context.Context, req *pb.Finish
 		BigWinClearedQuestMissionIdList: outcome.BigWinClearedQuestMissionIds,
 		ReplayFlowFirstClearReward:      toProtoRewards(outcome.ReplayFlowFirstClearRewards),
 		UserStatusCampaignReward:        []*pb.QuestReward{},
-		DiffUserData:                    diff,
 	}, nil
 }
 
 func (s *QuestServiceServer) RestartMainQuest(ctx context.Context, req *pb.RestartMainQuestRequest) (*pb.RestartMainQuestResponse, error) {
 	log.Printf("[QuestService] RestartMainQuest: questId=%d isMainFlow=%v", req.QuestId, req.IsMainFlow)
 
-	userId := currentUserId(ctx, s.users, s.sessions)
-	user, _ := s.users.UpdateUser(userId, func(user *store.UserState) {
+	userId := CurrentUserId(ctx, s.users, s.sessions)
+	var deckNumber int32
+	s.users.UpdateUser(userId, func(user *store.UserState) {
 		s.engine.HandleQuestRestart(user, req.QuestId, gametime.NowMillis())
+		deckNumber = user.Quests[req.QuestId].UserDeckNumber
 	})
 
 	drops := s.engine.BattleDropRewards(req.QuestId)
@@ -231,33 +149,22 @@ func (s *QuestServiceServer) RestartMainQuest(ctx context.Context, req *pb.Resta
 
 	return &pb.RestartMainQuestResponse{
 		BattleDropReward: pbDrops,
-		DeckNumber:       user.Quests[req.QuestId].UserDeckNumber,
-		DiffUserData: buildSelectedQuestDiff(user, []string{
-			"IUserStatus",
-			"IUserQuest",
-			"IUserQuestMission",
-			"IUserMainQuestFlowStatus",
-			"IUserMainQuestMainFlowStatus",
-			"IUserMainQuestProgressStatus",
-			"IUserMainQuestSeasonRoute",
-		}),
+		DeckNumber:       deckNumber,
 	}, nil
 }
 
 func (s *QuestServiceServer) FinishAutoOrbit(ctx context.Context, req *emptypb.Empty) (*pb.FinishAutoOrbitResponse, error) {
 	log.Printf("[QuestService] FinishAutoOrbit")
-	return &pb.FinishAutoOrbitResponse{
-		DiffUserData: userdata.EmptyDiff(),
-	}, nil
+	return &pb.FinishAutoOrbitResponse{}, nil
 }
 
 func (s *QuestServiceServer) SkipQuest(ctx context.Context, req *pb.SkipQuestRequest) (*pb.SkipQuestResponse, error) {
 	log.Printf("[QuestService] SkipQuest: questId=%d skipCount=%d useEffectItems=%d", req.QuestId, req.SkipCount, len(req.UseEffectItem))
 
 	nowMillis := gametime.NowMillis()
-	userId := currentUserId(ctx, s.users, s.sessions)
+	userId := CurrentUserId(ctx, s.users, s.sessions)
 	var outcome questflow.FinishOutcome
-	user, _ := s.users.UpdateUser(userId, func(user *store.UserState) {
+	s.users.UpdateUser(userId, func(user *store.UserState) {
 		for _, item := range req.UseEffectItem {
 			log.Printf("[QuestService] SkipQuest UseEffectItem: consumableItemId=%d count=%d", item.ConsumableItemId, item.Count)
 			user.ConsumableItems[item.ConsumableItemId] -= item.Count
@@ -271,24 +178,14 @@ func (s *QuestServiceServer) SkipQuest(ctx context.Context, req *pb.SkipQuestReq
 	return &pb.SkipQuestResponse{
 		DropReward:               toProtoRewards(outcome.DropRewards),
 		UserStatusCampaignReward: []*pb.QuestReward{},
-		DiffUserData: buildSelectedQuestDiff(user, []string{
-			"IUserQuest",
-			"IUserStatus",
-			"IUserConsumableItem",
-			"IUserMaterial",
-			"IUserParts",
-			"IUserPartsGroupNote",
-			"IUserCharacter",
-			"IUserCostume",
-		}),
 	}, nil
 }
 
 func (s *QuestServiceServer) SetRoute(ctx context.Context, req *pb.SetRouteRequest) (*pb.SetRouteResponse, error) {
 	log.Printf("[QuestService] SetRoute: mainQuestRouteId=%d", req.MainQuestRouteId)
 
-	userId := currentUserId(ctx, s.users, s.sessions)
-	user, _ := s.users.UpdateUser(userId, func(user *store.UserState) {
+	userId := CurrentUserId(ctx, s.users, s.sessions)
+	s.users.UpdateUser(userId, func(user *store.UserState) {
 		user.MainQuest.CurrentMainQuestRouteId = req.MainQuestRouteId
 		if seasonId, ok := s.engine.SeasonIdByRouteId[req.MainQuestRouteId]; ok {
 			user.MainQuest.MainQuestSeasonId = seasonId
@@ -298,30 +195,22 @@ func (s *QuestServiceServer) SetRoute(ctx context.Context, req *pb.SetRouteReque
 		user.PortalCageStatus.LatestVersion = now
 	})
 
-	return &pb.SetRouteResponse{
-		DiffUserData: buildSelectedQuestDiff(user, []string{
-			"IUserMainQuestSeasonRoute",
-			"IUserMainQuestMainFlowStatus",
-			"IUserPortalCageStatus",
-		}),
-	}, nil
+	return &pb.SetRouteResponse{}, nil
 }
 
 func (s *QuestServiceServer) SetQuestSceneChoice(ctx context.Context, req *pb.SetQuestSceneChoiceRequest) (*pb.SetQuestSceneChoiceResponse, error) {
 	log.Printf("[QuestService] SetQuestSceneChoice: questSceneId=%d choiceNumber=%d",
 		req.QuestSceneId, req.ChoiceNumber)
-	return &pb.SetQuestSceneChoiceResponse{
-		DiffUserData: userdata.EmptyDiff(),
-	}, nil
+	return &pb.SetQuestSceneChoiceResponse{}, nil
 }
 
 func (s *QuestServiceServer) ResetLimitContentQuestProgress(ctx context.Context, req *pb.ResetLimitContentQuestProgressRequest) (*pb.ResetLimitContentQuestProgressResponse, error) {
 	log.Printf("[QuestService] ResetLimitContentQuestProgress: eventQuestChapterId=%d questId=%d",
 		req.EventQuestChapterId, req.QuestId)
 
-	userId := currentUserId(ctx, s.users, s.sessions)
+	userId := CurrentUserId(ctx, s.users, s.sessions)
 	nowMillis := gametime.NowMillis()
-	user, _ := s.users.UpdateUser(userId, func(user *store.UserState) {
+	s.users.UpdateUser(userId, func(user *store.UserState) {
 		if _, exists := user.SideStoryQuests[req.QuestId]; exists {
 			user.SideStoryQuests[req.QuestId] = store.SideStoryQuestProgress{
 				HeadSideStoryQuestSceneId: 0,
@@ -339,20 +228,14 @@ func (s *QuestServiceServer) ResetLimitContentQuestProgress(ctx context.Context,
 		}
 	})
 
-	return &pb.ResetLimitContentQuestProgressResponse{
-		DiffUserData: buildSelectedQuestDiff(user, []string{
-			"IUserSideStoryQuest",
-			"IUserSideStoryQuestSceneProgressStatus",
-			"IUserQuestLimitContentStatus",
-		}),
-	}, nil
+	return &pb.ResetLimitContentQuestProgressResponse{}, nil
 }
 
 func (s *QuestServiceServer) SetAutoSaleSetting(ctx context.Context, req *pb.SetAutoSaleSettingRequest) (*pb.SetAutoSaleSettingResponse, error) {
 	log.Printf("[QuestService] SetAutoSaleSetting: items=%d", len(req.AutoSaleSettingItem))
 
-	userId := currentUserId(ctx, s.users, s.sessions)
-	user, _ := s.users.UpdateUser(userId, func(user *store.UserState) {
+	userId := CurrentUserId(ctx, s.users, s.sessions)
+	s.users.UpdateUser(userId, func(user *store.UserState) {
 		user.AutoSaleSettings = make(map[int32]store.AutoSaleSettingState, len(req.AutoSaleSettingItem))
 		for itemType, itemValue := range req.AutoSaleSettingItem {
 			user.AutoSaleSettings[itemType] = store.AutoSaleSettingState{
@@ -362,9 +245,5 @@ func (s *QuestServiceServer) SetAutoSaleSetting(ctx context.Context, req *pb.Set
 		}
 	})
 
-	return &pb.SetAutoSaleSettingResponse{
-		DiffUserData: buildSelectedQuestDiff(user, []string{
-			"IUserAutoSaleSettingDetail",
-		}),
-	}, nil
+	return &pb.SetAutoSaleSettingResponse{}, nil
 }

@@ -1,16 +1,19 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
-
-	"strconv"
-	"strings"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"lunar-tear/server/internal/database"
 	"lunar-tear/server/internal/gacha"
 	"lunar-tear/server/internal/gametime"
 	"lunar-tear/server/internal/masterdata"
+	"lunar-tear/server/internal/masterdata/memorydb"
 	"lunar-tear/server/internal/questflow"
 
 	"lunar-tear/server/internal/schedule"
@@ -18,24 +21,25 @@ import (
 )
 
 func main() {
-	httpPort := flag.Int("http-port", 8080, "HTTP server port (Octo API)")
-	grpcPort := flag.Int("grpc-port", 443, "gRPC server port")
-	host := flag.String("host", "127.0.0.1", "hostname the client will connect to")
+	listen := flag.String("listen", "0.0.0.0:443", "gRPC listen address (host:port)")
+	publicAddr := flag.String("public-addr", "127.0.0.1:443", "externally-reachable host:port advertised to clients")
 	dbPath := flag.String("db", "db/game.db", "SQLite database path")
-	contentSchedulePath := flag.String("content-schedule", "content_schedule.json", "Path to content schedule config")
+	contentSchedulePath := flag.String("content-schedule", "assets/release/content_schedule.json", "Path to content schedule config")
+	octoURL := flag.String("octo-url", "", "Octo CDN base URL the client will use for assets (e.g. http://10.0.2.2:8080)")
+	authURL := flag.String("auth-url", "", "Auth server base URL for Facebook token validation (e.g. http://localhost:3000)")
 	flag.Parse()
 
-	octoURL := "http://" + *host + ":" + strconv.Itoa(*httpPort)
-	prefix := octoURL + "/"
-	padLen := 43 - len(prefix)
-	resourcesBaseURL := ""
-	if padLen < 1 {
-		log.Printf("[config] host:port too long for 43-char resource URL; list.bin will be served unchanged")
-	} else {
-		resourcesBaseURL = prefix + strings.Repeat("r", padLen)
+	if *octoURL == "" {
+		log.Fatalf("--octo-url is required (e.g. http://10.0.2.2:8080)")
 	}
 
+	if err := memorydb.Init("assets/release/database.bin.e"); err != nil {
+		log.Fatalf("load master data: %v", err)
+	}
+	log.Printf("master data loaded (%d tables)", memorydb.TableCount())
 
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	db, err := database.Open(*dbPath)
 	if err != nil {
@@ -173,12 +177,34 @@ func main() {
 	sideStoryCatalog := masterdata.LoadSideStoryCatalog()
 	bigHuntCatalog := masterdata.LoadBigHuntCatalog()
 
-	go startHTTP(*httpPort, resourcesBaseURL, scheduleManager)
+	// Lightweight webhook endpoint for the standalone content-manager to trigger schedule reload.
+	go func() {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/api/admin/reload", func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodPost {
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
+			if err := scheduleManager.Reload(); err != nil {
+				log.Printf("[admin] reload failed: %v", err)
+				http.Error(w, "reload failed", http.StatusInternalServerError)
+				return
+			}
+			log.Println("[admin] schedule reloaded via webhook")
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"ok": true}`))
+		})
+		log.Println("[admin] webhook listener on :8081")
+		if err := http.ListenAndServe(":8081", mux); err != nil {
+			log.Printf("[admin] webhook listener failed: %v", err)
+		}
+	}()
 
-	startGRPC(
-		*host,
-		*grpcPort,
-		octoURL,
+	grpcServer := startGRPC(
+		*listen,
+		*publicAddr,
+		*octoURL,
+		*authURL,
 		userStore,
 		questHandler,
 		gachaHandler,
@@ -202,4 +228,12 @@ func main() {
 		sideStoryCatalog,
 		bigHuntCatalog,
 	)
+
+	<-ctx.Done()
+	log.Println("shutting down...")
+
+	grpcServer.GracefulStop()
+	database.Checkpoint(db)
+
+	log.Println("shutdown complete")
 }

@@ -8,7 +8,6 @@ import (
 	"lunar-tear/server/internal/masterdata"
 	"lunar-tear/server/internal/model"
 	"lunar-tear/server/internal/store"
-	"lunar-tear/server/internal/userdata"
 )
 
 type CharacterBoardServiceServer struct {
@@ -25,14 +24,9 @@ func NewCharacterBoardServiceServer(users store.UserRepository, sessions store.S
 func (s *CharacterBoardServiceServer) ReleasePanel(ctx context.Context, req *pb.ReleasePanelRequest) (*pb.ReleasePanelResponse, error) {
 	log.Printf("[CharacterBoardService] ReleasePanel: panelIds=%v", req.CharacterBoardPanelId)
 
-	userId := currentUserId(ctx, s.users, s.sessions)
+	userId := CurrentUserId(ctx, s.users, s.sessions)
 
-	oldUser, _ := s.users.LoadUser(userId)
-	tracker := userdata.NewDeleteTracker().
-		Track("IUserMaterial", oldUser, userdata.SortedMaterialRecords, []string{"userId", "materialId"}).
-		Track("IUserConsumableItem", oldUser, userdata.SortedConsumableItemRecords, []string{"userId", "consumableItemId"})
-
-	user, _ := s.users.UpdateUser(userId, func(user *store.UserState) {
+	s.users.UpdateUser(userId, func(user *store.UserState) {
 		for _, panelId := range req.CharacterBoardPanelId {
 			panel, ok := s.catalog.PanelById[panelId]
 			if !ok {
@@ -46,28 +40,17 @@ func (s *CharacterBoardServiceServer) ReleasePanel(ctx context.Context, req *pb.
 		}
 	})
 
-	boardTables := []string{
-		"IUserCharacterBoard",
-		"IUserCharacterBoardAbility",
-		"IUserCharacterBoardStatusUp",
-		"IUserMaterial",
-		"IUserConsumableItem",
-		"IUserGem",
-	}
-	tables := userdata.ProjectTables(user, boardTables)
-	diff := tracker.Apply(user, tables)
-
-	return &pb.ReleasePanelResponse{DiffUserData: diff}, nil
+	return &pb.ReleasePanelResponse{}, nil
 }
 
-func (s *CharacterBoardServiceServer) consumeCosts(user *store.UserState, panel masterdata.CharacterBoardPanelRow) {
+func (s *CharacterBoardServiceServer) consumeCosts(user *store.UserState, panel masterdata.EntityMCharacterBoardPanel) {
 	costs := s.catalog.ReleaseCostsByGroupId[panel.CharacterBoardPanelReleasePossessionGroupId]
 	for _, cost := range costs {
 		store.DeductPossession(user, model.PossessionType(cost.PossessionType), cost.PossessionId, cost.Count)
 	}
 }
 
-func (s *CharacterBoardServiceServer) setReleaseBit(user *store.UserState, panel masterdata.CharacterBoardPanelRow) {
+func (s *CharacterBoardServiceServer) setReleaseBit(user *store.UserState, panel masterdata.EntityMCharacterBoardPanel) {
 	boardId := panel.CharacterBoardId
 	board := user.CharacterBoards[boardId]
 	board.CharacterBoardId = boardId
@@ -90,7 +73,7 @@ func (s *CharacterBoardServiceServer) setReleaseBit(user *store.UserState, panel
 	user.CharacterBoards[boardId] = board
 }
 
-func (s *CharacterBoardServiceServer) applyEffects(user *store.UserState, panel masterdata.CharacterBoardPanelRow) {
+func (s *CharacterBoardServiceServer) applyEffects(user *store.UserState, panel masterdata.EntityMCharacterBoardPanel) {
 	effects := s.catalog.ReleaseEffectsByGroupId[panel.CharacterBoardPanelReleaseEffectGroupId]
 	for _, eff := range effects {
 		switch model.CharacterBoardEffectType(eff.CharacterBoardEffectType) {
@@ -102,7 +85,7 @@ func (s *CharacterBoardServiceServer) applyEffects(user *store.UserState, panel 
 	}
 }
 
-func (s *CharacterBoardServiceServer) applyAbilityEffect(user *store.UserState, eff masterdata.CharacterBoardReleaseEffectRow) {
+func (s *CharacterBoardServiceServer) applyAbilityEffect(user *store.UserState, eff masterdata.EntityMCharacterBoardPanelReleaseEffectGroup) {
 	ability, ok := s.catalog.AbilityById[eff.CharacterBoardEffectId]
 	if !ok {
 		log.Printf("[CharacterBoardService] unknown abilityId=%d", eff.CharacterBoardEffectId)
@@ -127,7 +110,7 @@ func (s *CharacterBoardServiceServer) applyAbilityEffect(user *store.UserState, 
 	user.CharacterBoardAbilities[key] = state
 }
 
-func (s *CharacterBoardServiceServer) applyStatusUpEffect(user *store.UserState, eff masterdata.CharacterBoardReleaseEffectRow) {
+func (s *CharacterBoardServiceServer) applyStatusUpEffect(user *store.UserState, eff masterdata.EntityMCharacterBoardPanelReleaseEffectGroup) {
 	statusUp, ok := s.catalog.StatusUpById[eff.CharacterBoardEffectId]
 	if !ok {
 		log.Printf("[CharacterBoardService] unknown statusUpId=%d", eff.CharacterBoardEffectId)

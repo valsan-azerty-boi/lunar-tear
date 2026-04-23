@@ -7,7 +7,6 @@ import (
 	pb "lunar-tear/server/gen/proto"
 	"lunar-tear/server/internal/gametime"
 	"lunar-tear/server/internal/store"
-	"lunar-tear/server/internal/userdata"
 )
 
 type BattleServiceServer struct {
@@ -22,7 +21,7 @@ func NewBattleServiceServer(users store.UserRepository, sessions store.SessionRe
 
 func (s *BattleServiceServer) StartWave(ctx context.Context, req *pb.StartWaveRequest) (*pb.StartWaveResponse, error) {
 	log.Printf("[BattleService] StartWave: userParty=%d npcParty=%d", len(req.UserPartyInitialInfoList), len(req.NpcPartyInitialInfoList))
-	userId := currentUserId(ctx, s.users, s.sessions)
+	userId := CurrentUserId(ctx, s.users, s.sessions)
 	s.users.UpdateUser(userId, func(user *store.UserState) {
 		user.Battle.IsActive = true
 		user.Battle.StartCount++
@@ -30,15 +29,13 @@ func (s *BattleServiceServer) StartWave(ctx context.Context, req *pb.StartWaveRe
 		user.Battle.LastUserPartyCount = int32(len(req.UserPartyInitialInfoList))
 		user.Battle.LastNpcPartyCount = int32(len(req.NpcPartyInitialInfoList))
 	})
-	return &pb.StartWaveResponse{
-		DiffUserData: userdata.EmptyDiff(),
-	}, nil
+	return &pb.StartWaveResponse{}, nil
 }
 
 func (s *BattleServiceServer) FinishWave(ctx context.Context, req *pb.FinishWaveRequest) (*pb.FinishWaveResponse, error) {
 	log.Printf("[BattleService] FinishWave: battleBinary=%d userParty=%d npcParty=%d elapsedFrames=%d",
 		len(req.BattleBinary), len(req.UserPartyResultInfoList), len(req.NpcPartyResultInfoList), req.ElapsedFrameCount)
-	userId := currentUserId(ctx, s.users, s.sessions)
+	userId := CurrentUserId(ctx, s.users, s.sessions)
 	s.users.UpdateUser(userId, func(user *store.UserState) {
 		user.Battle.IsActive = false
 		user.Battle.FinishCount++
@@ -48,7 +45,5 @@ func (s *BattleServiceServer) FinishWave(ctx context.Context, req *pb.FinishWave
 		user.Battle.LastBattleBinarySize = int32(len(req.BattleBinary))
 		user.Battle.LastElapsedFrameCount = req.ElapsedFrameCount
 	})
-	return &pb.FinishWaveResponse{
-		DiffUserData: userdata.EmptyDiff(),
-	}, nil
+	return &pb.FinishWaveResponse{}, nil
 }

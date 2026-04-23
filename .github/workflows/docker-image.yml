@@ -1,4 +1,4 @@
-name: Build and Push lunar-tear to Docker Hub
+name: Build and Push Docker images to Docker Hub
 
 on:
   push:
@@ -17,10 +17,26 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push Docker image
+      - name: Build and push game server image
         uses: docker/build-push-action@v5
         with:
           context: ./server
           file: ./server/Dockerfile
           push: true
           tags: kretts/lunar-tear:latest
+
+      - name: Build and push CDN image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./server
+          file: ./server/Dockerfile.cdn
+          push: true
+          tags: kretts/octo-cdn:latest
+
+      - name: Build and push auth server image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./server
+          file: ./server/Dockerfile.auth
+          push: true
+          tags: kretts/auth-server:latest

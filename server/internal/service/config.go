@@ -5,7 +5,6 @@ import (
 	"log"
 
 	pb "lunar-tear/server/gen/proto"
-	"lunar-tear/server/internal/userdata"
 
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -14,7 +13,7 @@ type ConfigServiceServer struct {
 	pb.UnimplementedConfigServiceServer
 	GrpcHost string
 	GrpcPort int32
-	OctoURL  string // HTTP base URL for Octo (list + assets); client uses this instead of default resources.app.nierreincarnation.com
+	OctoURL  string
 }
 
 func NewConfigServiceServer(host string, port int32, octoURL string) *ConfigServiceServer {
@@ -42,6 +41,5 @@ func (s *ConfigServiceServer) GetReviewServerConfig(ctx context.Context, _ *empt
 		MasterData: &pb.MasterDataConfig{
 			UrlFormat: s.OctoURL + "/master-data/%s",
 		},
-		DiffUserData: userdata.EmptyDiff(),
 	}, nil
 }

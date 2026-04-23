@@ -100,12 +100,20 @@ type WeaponStoryReleaseCond struct {
 	ConditionValue                  int32
 }
 
+type PartsRef struct {
+	PartsGroupId                  int32
+	PartsStatusMainLotteryGroupId int32
+}
+
 type PossessionGranter struct {
 	CostumeById        map[int32]CostumeRef
 	WeaponById         map[int32]WeaponRef
 	WeaponSkillSlots   map[int32][]int32
 	WeaponAbilitySlots map[int32][]int32
 	ReleaseConditions  map[int32][]WeaponStoryReleaseCond
+
+	PartsById                            map[int32]PartsRef
+	DefaultPartsStatusMainByLotteryGroup map[int32]int32
 
 	LastChangedStoryWeaponIds []int32
 }
@@ -122,6 +130,10 @@ func (g *PossessionGranter) GrantFull(user *UserState, possessionType model.Poss
 		g.GrantCostume(user, possessionId, nowMillis)
 	case model.PossessionTypeWeapon, model.PossessionTypeWeaponEnhanced:
 		g.GrantWeapon(user, possessionId, nowMillis)
+	case model.PossessionTypeCompanion, model.PossessionTypeCompanionEnhanced:
+		g.GrantCompanion(user, possessionId, nowMillis)
+	case model.PossessionTypeParts, model.PossessionTypePartsEnhanced:
+		g.GrantParts(user, possessionId, nowMillis)
 	default:
 		GrantPossession(user, possessionType, possessionId, count)
 	}
@@ -152,6 +164,44 @@ func (g *PossessionGranter) GrantCostume(user *UserState, costumeId int32, nowMi
 	user.CostumeActiveSkills[key] = CostumeActiveSkillState{
 		UserCostumeUuid:     key,
 		Level:               1,
+		AcquisitionDatetime: nowMillis,
+	}
+}
+
+func (g *PossessionGranter) GrantCompanion(user *UserState, companionId int32, nowMillis int64) {
+	for _, row := range user.Companions {
+		if row.CompanionId == companionId {
+			return
+		}
+	}
+	key := uuid.New().String()
+	user.Companions[key] = CompanionState{
+		UserCompanionUuid:   key,
+		CompanionId:         companionId,
+		Level:               1,
+		HeadupDisplayViewId: 1,
+		AcquisitionDatetime: nowMillis,
+	}
+}
+
+func (g *PossessionGranter) GrantParts(user *UserState, partsId int32, nowMillis int64) {
+	var mainStatId int32
+	if ref, ok := g.PartsById[partsId]; ok {
+		mainStatId = g.DefaultPartsStatusMainByLotteryGroup[ref.PartsStatusMainLotteryGroupId]
+		if _, exists := user.PartsGroupNotes[ref.PartsGroupId]; !exists {
+			user.PartsGroupNotes[ref.PartsGroupId] = PartsGroupNoteState{
+				PartsGroupId:             ref.PartsGroupId,
+				FirstAcquisitionDatetime: nowMillis,
+				LatestVersion:            nowMillis,
+			}
+		}
+	}
+	key := uuid.New().String()
+	user.Parts[key] = PartsState{
+		UserPartsUuid:       key,
+		PartsId:             partsId,
+		Level:               1,
+		PartsStatusMainId:   mainStatId,
 		AcquisitionDatetime: nowMillis,
 	}
 }
@@ -330,31 +380,84 @@ func ApplyDeckReplacement(user *UserState, deckType model.DeckType, userDeckNumb
 		deck.Power = 100
 	}
 
-	uuidPtrs := []*string{&deck.UserDeckCharacterUuid01, &deck.UserDeckCharacterUuid02, &deck.UserDeckCharacterUuid03}
-	for i, uuidPtr := range uuidPtrs {
+	for _, oldUuid := range []string{deck.UserDeckCharacterUuid01, deck.UserDeckCharacterUuid02, deck.UserDeckCharacterUuid03} {
+		if oldUuid == "" {
+			continue
+		}
+		delete(user.DeckCharacters, oldUuid)
+		delete(user.DeckSubWeapons, oldUuid)
+		delete(user.DeckParts, oldUuid)
+	}
+
+	var newUuids [3]string
+	for i := range 3 {
 		if i >= len(slots) || slots[i].UserCostumeUuid == "" {
-			*uuidPtr = ""
 			continue
 		}
 		slot := slots[i]
-		dcUuid := *uuidPtr
-		if dcUuid == "" {
-			dcUuid = uuid.New().String()
+		dcUuid := uuid.New().String()
+		user.DeckCharacters[dcUuid] = DeckCharacterState{
+			UserDeckCharacterUuid: dcUuid,
+			UserCostumeUuid:       slot.UserCostumeUuid,
+			MainUserWeaponUuid:    slot.MainUserWeaponUuid,
+			UserCompanionUuid:     slot.UserCompanionUuid,
+			UserThoughtUuid:       slot.UserThoughtUuid,
+			DressupCostumeId:      slot.DressupCostumeId,
+			LatestVersion:         nowMillis,
 		}
-		dc := user.DeckCharacters[dcUuid]
-		dc.UserDeckCharacterUuid = dcUuid
-		dc.UserCostumeUuid = slot.UserCostumeUuid
-		dc.MainUserWeaponUuid = slot.MainUserWeaponUuid
-		dc.UserCompanionUuid = slot.UserCompanionUuid
-		dc.UserThoughtUuid = slot.UserThoughtUuid
-		dc.DressupCostumeId = slot.DressupCostumeId
-		dc.LatestVersion = nowMillis
-		user.DeckCharacters[dcUuid] = dc
 		user.DeckSubWeapons[dcUuid] = slot.SubWeaponUuids
 		user.DeckParts[dcUuid] = slot.PartsUuids
-		*uuidPtr = dcUuid
+		newUuids[i] = dcUuid
 	}
 
+	deck.UserDeckCharacterUuid01 = newUuids[0]
+	deck.UserDeckCharacterUuid02 = newUuids[1]
+	deck.UserDeckCharacterUuid03 = newUuids[2]
 	deck.LatestVersion = nowMillis
 	user.Decks[deckKey] = deck
+}
+
+func RemoveDeckData(user *UserState, deckType model.DeckType, userDeckNumber int32) {
+	deckKey := DeckKey{DeckType: deckType, UserDeckNumber: userDeckNumber}
+	deck, ok := user.Decks[deckKey]
+	if !ok {
+		return
+	}
+	for _, dcUuid := range []string{deck.UserDeckCharacterUuid01, deck.UserDeckCharacterUuid02, deck.UserDeckCharacterUuid03} {
+		if dcUuid == "" {
+			continue
+		}
+		delete(user.DeckCharacters, dcUuid)
+		delete(user.DeckSubWeapons, dcUuid)
+		delete(user.DeckParts, dcUuid)
+	}
+	delete(user.Decks, deckKey)
+}
+
+func ReadDeckSlots(user *UserState, deckType model.DeckType, userDeckNumber int32) []DeckCharacterInput {
+	deckKey := DeckKey{DeckType: deckType, UserDeckNumber: userDeckNumber}
+	deck, ok := user.Decks[deckKey]
+	if !ok {
+		return nil
+	}
+	slots := make([]DeckCharacterInput, 3)
+	for i, dcUuid := range []string{deck.UserDeckCharacterUuid01, deck.UserDeckCharacterUuid02, deck.UserDeckCharacterUuid03} {
+		if dcUuid == "" {
+			continue
+		}
+		dc, ok := user.DeckCharacters[dcUuid]
+		if !ok {
+			continue
+		}
+		slots[i] = DeckCharacterInput{
+			UserCostumeUuid:    dc.UserCostumeUuid,
+			MainUserWeaponUuid: dc.MainUserWeaponUuid,
+			SubWeaponUuids:     user.DeckSubWeapons[dcUuid],
+			PartsUuids:         user.DeckParts[dcUuid],
+			UserCompanionUuid:  dc.UserCompanionUuid,
+			UserThoughtUuid:    dc.UserThoughtUuid,
+			DressupCostumeId:   dc.DressupCostumeId,
+		}
+	}
+	return slots
 }

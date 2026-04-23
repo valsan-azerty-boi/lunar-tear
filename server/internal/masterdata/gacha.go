@@ -10,24 +10,6 @@ import (
 	"lunar-tear/server/internal/utils"
 )
 
-type gachaMedalRow struct {
-	GachaMedalId          int32 `json:"GachaMedalId"`
-	ShopTransitionGachaId int32 `json:"ShopTransitionGachaId"`
-	ConsumableItemId      int32 `json:"ConsumableItemId"`
-	AutoConvertDatetime   int64 `json:"AutoConvertDatetime"`
-	ConversionRate        int32 `json:"ConversionRate"`
-}
-
-type momBannerRow struct {
-	MomBannerId           int32  `json:"MomBannerId"`
-	SortOrderDesc         int32  `json:"SortOrderDesc"`
-	DestinationDomainType int32  `json:"DestinationDomainType"`
-	DestinationDomainId   int32  `json:"DestinationDomainId"`
-	BannerAssetName       string `json:"BannerAssetName"`
-	StartDatetime         int64  `json:"StartDatetime"`
-	EndDatetime           int64  `json:"EndDatetime"`
-}
-
 type GachaMedalInfo struct {
 	GachaMedalId        int32
 	ConsumableItemId    int32
@@ -38,16 +20,16 @@ type GachaMedalInfo struct {
 const chapterGachaIdBase int32 = 200000
 
 func LoadGachaCatalog() ([]store.GachaCatalogEntry, map[int32]GachaMedalInfo, error) {
-	medals, err := utils.ReadJSON[gachaMedalRow]("EntityMGachaMedalTable.json")
+	medals, err := utils.ReadTable[EntityMGachaMedal]("m_gacha_medal")
 	if err != nil {
 		return nil, nil, fmt.Errorf("load gacha medal table: %w", err)
 	}
-	banners, err := utils.ReadJSON[momBannerRow]("EntityMMomBannerTable.json")
+	banners, err := utils.ReadTable[EntityMMomBanner]("m_mom_banner")
 	if err != nil {
 		return nil, nil, fmt.Errorf("load mom banner table: %w", err)
 	}
 
-	gachaToMedal := make(map[int32]gachaMedalRow)
+	gachaToMedal := make(map[int32]EntityMGachaMedal)
 	medalInfoByGacha := make(map[int32]GachaMedalInfo)
 	for _, m := range medals {
 		gachaToMedal[m.ShopTransitionGachaId] = m
@@ -59,7 +41,7 @@ func LoadGachaCatalog() ([]store.GachaCatalogEntry, map[int32]GachaMedalInfo, er
 		}
 	}
 
-	stepupSteps := make(map[int32][]momBannerRow)
+	stepupSteps := make(map[int32][]EntityMMomBanner)
 	var entries []store.GachaCatalogEntry
 
 	for _, b := range banners {

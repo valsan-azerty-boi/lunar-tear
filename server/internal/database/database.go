@@ -3,6 +3,7 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 
@@ -39,4 +40,10 @@ func Open(path string) (*sql.DB, error) {
 	}
 
 	return db, nil
+}
+
+func Checkpoint(db *sql.DB) {
+	if _, err := db.Exec("PRAGMA wal_checkpoint(TRUNCATE)"); err != nil {
+		log.Printf("WAL checkpoint: %v", err)
+	}
 }

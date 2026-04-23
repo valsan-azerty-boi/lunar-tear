@@ -30,6 +30,7 @@ func CloneUserState(u UserState) UserState {
 	out.Parts = maps.Clone(u.Parts)
 	out.PartsGroupNotes = maps.Clone(u.PartsGroupNotes)
 	out.PartsPresets = maps.Clone(u.PartsPresets)
+	out.PartsStatusSubs = maps.Clone(u.PartsStatusSubs)
 	out.ImportantItems = maps.Clone(u.ImportantItems)
 	out.CostumeActiveSkills = maps.Clone(u.CostumeActiveSkills)
 	out.WeaponSkills = cloneSliceMap(u.WeaponSkills)

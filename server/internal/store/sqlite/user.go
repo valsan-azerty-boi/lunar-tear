@@ -4,10 +4,11 @@ import (
 	"database/sql"
 	"fmt"
 
+	"lunar-tear/server/internal/model"
 	"lunar-tear/server/internal/store"
 )
 
-func (s *SQLiteStore) CreateUser(uuid string) (int64, error) {
+func (s *SQLiteStore) CreateUser(uuid string, platform model.ClientPlatform) (int64, error) {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return 0, fmt.Errorf("begin tx: %w", err)
@@ -24,8 +25,8 @@ func (s *SQLiteStore) CreateUser(uuid string) (int64, error) {
 
 	res, err := tx.Exec(`INSERT INTO users (uuid, player_id, os_type, platform_type, user_restriction_type,
 		register_datetime, game_start_datetime, latest_version, birth_year, birth_month,
-		backup_token, charge_money_this_month) VALUES (?, 0, 2, 2, 0, ?, ?, 0, 2000, 1, 'mock-backup-token', 0)`,
-		uuid, nowMillis, nowMillis)
+		backup_token, charge_money_this_month) VALUES (?, 0, ?, ?, 0, ?, ?, 0, 2000, 1, 'mock-backup-token', 0)`,
+		uuid, platform.OsType, platform.PlatformType, nowMillis, nowMillis)
 	if err != nil {
 		return 0, fmt.Errorf("insert user: %w", err)
 	}
@@ -39,7 +40,7 @@ func (s *SQLiteStore) CreateUser(uuid string) (int64, error) {
 		return 0, fmt.Errorf("update player_id: %w", err)
 	}
 
-	user := store.SeedUserState(userId, uuid, nowMillis)
+	user := store.SeedUserState(userId, uuid, nowMillis, platform)
 	if err := writeUserState(tx, userId, user); err != nil {
 		return 0, fmt.Errorf("write seed state: %w", err)
 	}
@@ -122,6 +123,7 @@ func (s *SQLiteStore) ImportUser(u *store.UserState) error {
 		"user_deck_sub_weapons",
 		"user_decks",
 		"user_deck_characters",
+		"user_parts_status_subs",
 		"user_parts_presets",
 		"user_parts_group_notes",
 		"user_parts",
@@ -187,6 +189,52 @@ func (s *SQLiteStore) ImportUser(u *store.UserState) error {
 
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit: %w", err)
+	}
+
+	return nil
+}
+
+func (s *SQLiteStore) SetFacebookId(userId int64, facebookId int64) error {
+	_, err := s.db.Exec(`UPDATE users SET facebook_id = ? WHERE user_id = ?`, facebookId, userId)
+	if err != nil {
+		return fmt.Errorf("set facebook_id: %w", err)
+	}
+	return nil
+}
+
+func (s *SQLiteStore) GetUserByFacebookId(facebookId int64) (int64, error) {
+	var userId int64
+	err := s.db.QueryRow(`SELECT user_id FROM users WHERE facebook_id = ?`, facebookId).Scan(&userId)
+	if err == sql.ErrNoRows {
+		return 0, store.ErrNotFound
+	}
+	if err != nil {
+		return 0, fmt.Errorf("query user by facebook_id: %w", err)
+	}
+	return userId, nil
+}
+
+func (s *SQLiteStore) GetFacebookId(userId int64) (int64, error) {
+	var fbId sql.NullInt64
+	err := s.db.QueryRow(`SELECT facebook_id FROM users WHERE user_id = ?`, userId).Scan(&fbId)
+	if err != nil {
+		return 0, store.ErrNotFound
+	}
+	return fbId.Int64, nil
+}
+
+func (s *SQLiteStore) ClearFacebookId(userId int64) error {
+	_, err := s.db.Exec(`UPDATE users SET facebook_id = NULL WHERE user_id = ?`, userId)
+	if err != nil {
+		return fmt.Errorf("clear facebook_id: %w", err)
+	}
+	return nil
+}
+
+func (s *SQLiteStore) UpdateUUID(userId int64, newUuid string) error {
+	_, err := s.db.Exec(`UPDATE users SET uuid = ? WHERE user_id = ?`, newUuid, userId)
+	if err != nil {
+		return fmt.Errorf("update uuid: %w", err)
 	}
 	return nil
 }

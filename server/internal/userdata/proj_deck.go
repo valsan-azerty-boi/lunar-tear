@@ -5,31 +5,32 @@ import (
 
 	"lunar-tear/server/internal/model"
 	"lunar-tear/server/internal/store"
+	"lunar-tear/server/internal/utils"
 )
 
 func init() {
 	register("IUserDeck", func(user store.UserState) string {
-		s, _ := encodeJSONMaps(sortedDeckRecords(user)...)
+		s, _ := utils.EncodeJSONMaps(sortedDeckRecords(user)...)
 		return s
 	})
 	register("IUserDeckCharacter", func(user store.UserState) string {
-		s, _ := encodeJSONMaps(sortedDeckCharacterRecords(user)...)
+		s, _ := utils.EncodeJSONMaps(sortedDeckCharacterRecords(user)...)
 		return s
 	})
 	register("IUserDeckSubWeaponGroup", func(user store.UserState) string {
-		s, _ := encodeJSONMaps(sortedDeckSubWeaponGroupRecords(user)...)
+		s, _ := utils.EncodeJSONMaps(sortedDeckSubWeaponGroupRecords(user)...)
 		return s
 	})
 	register("IUserDeckTypeNote", func(user store.UserState) string {
-		s, _ := encodeJSONMaps(sortedDeckTypeNoteRecords(user)...)
+		s, _ := utils.EncodeJSONMaps(sortedDeckTypeNoteRecords(user)...)
 		return s
 	})
 	register("IUserDeckPartsGroup", func(user store.UserState) string {
-		s, _ := encodeJSONMaps(sortedDeckPartsGroupRecords(user)...)
+		s, _ := utils.EncodeJSONMaps(sortedDeckPartsGroupRecords(user)...)
 		return s
 	})
 	register("IUserDeckCharacterDressupCostume", func(user store.UserState) string {
-		s, _ := encodeJSONMaps(sortedDeckDressupCostumeRecords(user)...)
+		s, _ := utils.EncodeJSONMaps(sortedDeckDressupCostumeRecords(user)...)
 		return s
 	})
 	registerStatic(

@@ -9,7 +9,6 @@ import (
 	"lunar-tear/server/internal/masterdata"
 	"lunar-tear/server/internal/model"
 	"lunar-tear/server/internal/store"
-	"lunar-tear/server/internal/userdata"
 
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
@@ -34,7 +33,7 @@ func NewRewardServiceServer(
 func (s *RewardServiceServer) ReceiveBigHuntReward(ctx context.Context, _ *emptypb.Empty) (*pb.ReceiveBigHuntRewardResponse, error) {
 	log.Printf("[RewardService] ReceiveBigHuntReward")
 
-	userId := currentUserId(ctx, s.users, s.sessions)
+	userId := CurrentUserId(ctx, s.users, s.sessions)
 	nowMillis := gametime.NowMillis()
 	weeklyVersion := gametime.WeeklyVersion(nowMillis)
 
@@ -42,7 +41,7 @@ func (s *RewardServiceServer) ReceiveBigHuntReward(ctx context.Context, _ *empty
 	var weeklyRewards []*pb.BigHuntReward
 	isReceived := false
 
-	user, _ := s.users.UpdateUser(userId, func(user *store.UserState) {
+	s.users.UpdateUser(userId, func(user *store.UserState) {
 		ws := user.BigHuntWeeklyStatuses[weeklyVersion]
 		isReceived = ws.IsReceivedWeeklyReward
 
@@ -106,19 +105,11 @@ func (s *RewardServiceServer) ReceiveBigHuntReward(ctx context.Context, _ *empty
 		weeklyScoreResults = []*pb.WeeklyScoreResult{}
 	}
 
-	tables := userdata.ProjectTables(user, []string{
-		"IUserBigHuntWeeklyStatus",
-		"IUserBigHuntWeeklyMaxScore",
-		"IUserConsumableItem",
-		"IUserMaterial",
-	})
-
 	return &pb.ReceiveBigHuntRewardResponse{
 		WeeklyScoreResult:           weeklyScoreResults,
 		WeeklyScoreReward:           weeklyRewards,
 		IsReceivedWeeklyScoreReward: isReceived,
 		LastWeekWeeklyScoreReward:   []*pb.BigHuntReward{},
-		DiffUserData:                userdata.BuildDiffFromTables(tables),
 	}, nil
 }
 

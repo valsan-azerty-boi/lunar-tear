@@ -31,6 +31,7 @@ type UserState struct {
 	BirthMonth           int32
 	BackupToken          string
 	ChargeMoneyThisMonth int64
+	FacebookId           int64
 
 	Setting                 UserSettingState
 	Status                  UserStatusState
@@ -79,6 +80,7 @@ type UserState struct {
 	Parts                 map[string]PartsState
 	PartsGroupNotes       map[int32]PartsGroupNoteState
 	PartsPresets          map[int32]PartsPresetState
+	PartsStatusSubs       map[PartsStatusSubKey]PartsStatusSubState
 	ImportantItems        map[int32]int32
 	CostumeActiveSkills   map[string]CostumeActiveSkillState
 	WeaponSkills          map[string][]WeaponSkillState   // key: userWeaponUuid
@@ -195,6 +197,9 @@ func (u *UserState) EnsureMaps() {
 	}
 	if u.PartsPresets == nil {
 		u.PartsPresets = make(map[int32]PartsPresetState)
+	}
+	if u.PartsStatusSubs == nil {
+		u.PartsStatusSubs = make(map[PartsStatusSubKey]PartsStatusSubState)
 	}
 	if u.ImportantItems == nil {
 		u.ImportantItems = make(map[int32]int32)
@@ -830,6 +835,22 @@ type PartsPresetState struct {
 	Name                     string
 	UserPartsPresetTagNumber int32
 	LatestVersion            int64
+}
+
+type PartsStatusSubKey struct {
+	UserPartsUuid string
+	StatusIndex   int32
+}
+
+type PartsStatusSubState struct {
+	UserPartsUuid           string
+	StatusIndex             int32
+	PartsStatusSubLotteryId int32
+	Level                   int32
+	StatusKindType          int32
+	StatusCalculationType   int32
+	StatusChangeValue       int32
+	LatestVersion           int64
 }
 
 type NotificationState struct {
