@@ -3,8 +3,6 @@ package schedule
 import (
 	"fmt"
 	"log"
-	"os/exec"
-	"path/filepath"
 	"sync"
 	"time"
 
@@ -54,7 +52,6 @@ func NewManager(
 	}
 
 	m.rebuildFiltered()
-	m.runPatchScript()
 
 	log.Printf("[schedule] manager initialized: %d/%d gacha entries active, %d bundles enabled",
 		len(m.filteredGachaEntries), len(m.allGachaEntries), len(sched.ActiveBundles))
@@ -75,30 +72,9 @@ func (m *Manager) Reload() error {
 
 	m.schedule = sched
 	m.rebuildFiltered()
-	m.runPatchScript()
 	m.lastUpdatedMillis = time.Now().UnixMilli()
 
 	log.Printf("[schedule] reloaded: %d/%d gacha entries active, %d bundles enabled",
-		len(m.filteredGachaEntries), len(m.allGachaEntries), len(sched.ActiveBundles))
-
-	return nil
-}
-
-// UpdateSchedule updates the schedule, writes it to disk, and rebuilds filtered catalogs.
-func (m *Manager) UpdateSchedule(sched *ContentSchedule) error {
-	if err := SaveSchedule(m.configPath, sched); err != nil {
-		return err
-	}
-
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	m.schedule = sched
-	m.rebuildFiltered()
-	m.runPatchScript()
-	m.lastUpdatedMillis = time.Now().UnixMilli()
-
-	log.Printf("[schedule] updated: %d/%d gacha entries active, %d bundles enabled",
 		len(m.filteredGachaEntries), len(m.allGachaEntries), len(sched.ActiveBundles))
 
 	return nil
@@ -116,24 +92,6 @@ func (m *Manager) rebuildFiltered() {
 		}
 	}
 	m.filteredGachaEntries = filtered
-}
-
-// runPatchScript dynamically updates the database.bin.e using the python script.
-// It assumes python is in the PATH and the server is running from the server/ dir.
-func (m *Manager) runPatchScript() {
-	scriptPath := filepath.Join("..", "..", "lunar-scripts", "patch_masterdata.py")
-	log.Printf("[schedule] Running master data patcher via %s", scriptPath)
-
-	cmd := exec.Command("python", scriptPath, 
-		"--input", filepath.Join("assets", "release", "20240404193219.bin.e"),
-		"--output", filepath.Join("assets", "release", "database.bin.e"),
-		"--sync-schedule", m.configPath)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		log.Printf("[schedule] ERROR: dynamic patching failed: %v\nOutput: %s", err, string(out))
-	} else {
-		log.Printf("[schedule] Dynamic patching completed successfully.")
-	}
 }
 
 // --- Read accessors (concurrent-safe via RLock) ---

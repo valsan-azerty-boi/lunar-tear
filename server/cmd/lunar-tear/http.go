@@ -5,19 +5,29 @@ import (
 	"log"
 	"net/http"
 
+	"lunar-tear/server/internal/schedule"
 	"lunar-tear/server/internal/service"
 
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 )
 
-func startHTTP(port int, resourcesBaseURL string, adminMux *http.ServeMux) {
+func startHTTP(port int, resourcesBaseURL string, manager *schedule.Manager) {
 	mux := http.NewServeMux()
 
-	// Register admin routes if available
-	if adminMux != nil {
-		mux.Handle("/admin/", adminMux)
-	}
+	// Webhook for standalone content manager
+	mux.HandleFunc("/api/admin/reload", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if err := manager.Reload(); err != nil {
+			http.Error(w, "reload failed", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"ok": true}`))
+	})
 
 	// Octo routes (asset delivery) — catch-all
 	octoServer := service.NewOctoHTTPServer(resourcesBaseURL)

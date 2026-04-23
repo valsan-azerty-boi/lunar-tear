@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"log"
-	"net/http"
+
 	"strconv"
 	"strings"
 
@@ -12,8 +12,8 @@ import (
 	"lunar-tear/server/internal/gametime"
 	"lunar-tear/server/internal/masterdata"
 	"lunar-tear/server/internal/questflow"
+
 	"lunar-tear/server/internal/schedule"
-	"lunar-tear/server/internal/service"
 	"lunar-tear/server/internal/store/sqlite"
 )
 
@@ -35,7 +35,7 @@ func main() {
 		resourcesBaseURL = prefix + strings.Repeat("r", padLen)
 	}
 
-	var adminMux *http.ServeMux // set after scheduleManager is created
+
 
 	db, err := database.Open(*dbPath)
 	if err != nil {
@@ -173,8 +173,7 @@ func main() {
 	sideStoryCatalog := masterdata.LoadSideStoryCatalog()
 	bigHuntCatalog := masterdata.LoadBigHuntCatalog()
 
-	adminMux = service.RegisterAdminRoutes(scheduleManager)
-	go startHTTP(*httpPort, resourcesBaseURL, adminMux)
+	go startHTTP(*httpPort, resourcesBaseURL, scheduleManager)
 
 	startGRPC(
 		*host,
