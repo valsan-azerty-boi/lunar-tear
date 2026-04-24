@@ -55,6 +55,7 @@ type ports struct {
 
 func main() {
 	setupOnly := flag.Bool("setup-only", false, "show patching instructions and exit without building or launching")
+	preferSaved := flag.Bool("prefer-saved", false, "reuse saved config without prompting")
 	grpcPort := flag.Int("grpc-port", defaultGRPCPort, "gRPC server port")
 	cdnPort := flag.Int("cdn-port", defaultCDNPort, "CDN server port")
 	authPort := flag.Int("auth-port", defaultAuthPort, "auth server port")
@@ -77,7 +78,7 @@ func main() {
 		downloadDeps()
 	}
 
-	ip, cfg, firstRun := resolveIP()
+	ip, cfg, firstRun := resolveIP(*preferSaved)
 
 	p := resolvePorts(flagSet, *grpcPort, *cdnPort, *authPort, cfg)
 	savedPorts := portsFromConfig(cfg)
@@ -311,12 +312,25 @@ func runQuiet(cmd *exec.Cmd, label string) {
 	}
 }
 
-func resolveIP() (string, config, bool) {
-	if cfg, err := loadConfig(); err == nil {
+func resolveIP(preferSaved bool) (string, config, bool) {
+	cfg, err := loadConfig()
+	if err == nil {
+		if preferSaved {
+			if isLANBased(cfg) {
+				if ip, updated, ok := recheckLANIP(cfg); ok {
+					return ip, updated, false
+				}
+			}
+			return cfg.IP, cfg, false
+		}
+
 		ip, cfg, done := handleSavedConfig(cfg)
 		if done {
 			return ip, cfg, false
 		}
+	} else if preferSaved {
+		fmt.Fprintln(os.Stderr, "  --prefer-saved: no saved config found; run without the flag first.")
+		os.Exit(1)
 	}
 
 	ip, cfg := runWizard()
