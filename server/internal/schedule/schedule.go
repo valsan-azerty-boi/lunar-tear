@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"time"
 )
 
 // ContentSchedule represents the user-editable content configuration.
@@ -64,33 +63,6 @@ func SaveSchedule(path string, sched *ContentSchedule) error {
 	return nil
 }
 
-// ContentMonth converts a millisecond-epoch timestamp to a "YYYY-MM" bucket.
-func ContentMonth(startDatetimeMs int64) string {
-	if startDatetimeMs <= 0 {
-		return "unknown"
-	}
-	t := time.UnixMilli(startDatetimeMs).UTC()
-	return t.Format("2006-01")
-}
-
-// IsUnreleasedContent returns true if the start datetime indicates unreleased content (2099+).
-func IsUnreleasedContent(startDatetimeMs int64) bool {
-	if startDatetimeMs <= 0 {
-		return false
-	}
-	t := time.UnixMilli(startDatetimeMs).UTC()
-	return t.Year() >= 2099
-}
-
-// IsPermanentContent returns true for content with sentinel end datetimes (no real expiration).
-// The master data uses very large end dates (year 8000+) for permanent content.
-func IsPermanentContent(endDatetimeMs int64) bool {
-	if endDatetimeMs <= 0 {
-		return false
-	}
-	t := time.UnixMilli(endDatetimeMs).UTC()
-	return t.Year() >= 2090
-}
 
 // int32Set is a convenience helper for quick membership checks.
 type int32Set map[int32]struct{}

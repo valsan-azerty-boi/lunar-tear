@@ -31,9 +31,10 @@ type Manager struct {
 }
 
 // NewManager creates a schedule manager with the given config path and full catalogs.
-// It builds the bundle index from master data and applies the initial schedule filter.
+// It loads the bundle index from the given JSON file and applies the initial schedule filter.
 func NewManager(
 	configPath string,
+	bundleIndexPath string,
 	allGachaEntries []store.GachaCatalogEntry,
 ) (*Manager, error) {
 	sched, err := LoadSchedule(configPath)
@@ -41,7 +42,10 @@ func NewManager(
 		return nil, fmt.Errorf("load schedule: %w", err)
 	}
 
-	bundleIndex := BuildBundleIndex()
+	bundleIndex, err := LoadBundleIndex(bundleIndexPath)
+	if err != nil {
+		return nil, fmt.Errorf("load bundle index: %w", err)
+	}
 
 	m := &Manager{
 		configPath:        configPath,

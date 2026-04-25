@@ -1,9 +1,10 @@
 package schedule
 
 import (
+	"encoding/json"
+	"fmt"
 	"log"
-
-	"lunar-tear/server/internal/utils"
+	"os"
 )
 
 // BundleIndex maps content into monthly bundles, plus permanent and unreleased buckets.
@@ -22,171 +23,43 @@ type Bundle struct {
 	SideStories   []int32 `json:"side_stories"` // SideStoryQuestLimitContentIds linked via event chapters
 }
 
-func newBundle(label string) *Bundle {
-	return &Bundle{
-		Label:         label,
-		EventChapters: []int32{},
-		GachaIds:      []int32{},
-		LoginBonuses:  []int32{},
-		SideStories:   []int32{},
-	}
-}
-
-// --- Master data row types for bundle building (read from JSON) ---
-
-type eventQuestChapterRow struct {
-	EventQuestChapterId int32 `json:"EventQuestChapterId"`
-	StartDatetime       int64 `json:"StartDatetime"`
-	EndDatetime         int64 `json:"EndDatetime"`
-}
-
-type momBannerRow struct {
-	MomBannerId          int32  `json:"MomBannerId"`
-	DestinationDomainType int32  `json:"DestinationDomainType"`
-	DestinationDomainId  int32  `json:"DestinationDomainId"`
-	BannerAssetName      string `json:"BannerAssetName"`
-	StartDatetime        int64  `json:"StartDatetime"`
-	EndDatetime          int64  `json:"EndDatetime"`
-}
-
-type loginBonusRow struct {
-	LoginBonusId  int32 `json:"LoginBonusId"`
-	StartDatetime int64 `json:"StartDatetime"`
-	EndDatetime   int64 `json:"EndDatetime"`
-}
-
-type sideStoryLimitContentRow struct {
-	SideStoryQuestLimitContentId int32 `json:"SideStoryQuestLimitContentId"`
-	CharacterId                  int32 `json:"CharacterId"`
-	EventQuestChapterId          int32 `json:"EventQuestChapterId"`
-	DifficultyType               int32 `json:"DifficultyType"`
-}
-
-// momBannerDomainGacha matches model.MomBannerDomainGacha from the server.
-const momBannerDomainGacha int32 = 1
-
-// BuildBundleIndex constructs the bundle index from master data JSON files.
-// The JSON files are read from assets/master_data/ (the same location as other master data).
-func BuildBundleIndex() *BundleIndex {
-	idx := &BundleIndex{
-		Bundles:    make(map[string]*Bundle),
-		Permanent:  newBundle("Permanent Content"),
-		Unreleased: newBundle("Unreleased Content"),
-	}
-
-	// --- Event Quest Chapters ---
-	eventChapters, err := utils.ReadJSON[eventQuestChapterRow]("EntityMEventQuestChapterTable.json")
+// LoadBundleIndex reads the pre-generated bundle index from a JSON file.
+// This file is created by generate_bundle_index.py and maps all content
+// into monthly buckets, permanent, and unreleased categories.
+func LoadBundleIndex(path string) (*BundleIndex, error) {
+	data, err := os.ReadFile(path)
 	if err != nil {
-		log.Printf("[schedule] warning: could not load event quest chapters: %v", err)
+		return nil, fmt.Errorf("read bundle index %s: %w", path, err)
+	}
+	var idx BundleIndex
+	if err := json.Unmarshal(data, &idx); err != nil {
+		return nil, fmt.Errorf("parse bundle index %s: %w", path, err)
 	}
 
-	// Build chapter → month lookup for side story mapping
-	chapterMonth := make(map[int32]string, len(eventChapters))
-
-	for _, ch := range eventChapters {
-		month := ContentMonth(ch.StartDatetime)
-		chapterMonth[ch.EventQuestChapterId] = month
-
-		if IsUnreleasedContent(ch.StartDatetime) {
-			idx.Unreleased.EventChapters = append(idx.Unreleased.EventChapters, ch.EventQuestChapterId)
-			continue
-		}
-		if IsPermanentContent(ch.EndDatetime) && !IsUnreleasedContent(ch.StartDatetime) {
-			// Content with a real start date but permanent end date (e.g. EX chapters, main story events)
-			idx.Permanent.EventChapters = append(idx.Permanent.EventChapters, ch.EventQuestChapterId)
-			// Also add to the monthly bundle so it can be toggled
-		}
-		b := idx.getOrCreateBundle(month)
-		b.EventChapters = append(b.EventChapters, ch.EventQuestChapterId)
+	// Ensure no nil slices (makes downstream code simpler)
+	if idx.Bundles == nil {
+		idx.Bundles = make(map[string]*Bundle)
+	}
+	if idx.Permanent == nil {
+		idx.Permanent = &Bundle{}
+	}
+	if idx.Unreleased == nil {
+		idx.Unreleased = &Bundle{}
 	}
 
-	// --- Gacha Banners (MomBanner type 1 = gacha) ---
-	banners, err := utils.ReadJSON[momBannerRow]("EntityMMomBannerTable.json")
-	if err != nil {
-		log.Printf("[schedule] warning: could not load mom banners: %v", err)
+	totalEvents, totalGacha := 0, 0
+	for _, b := range idx.Bundles {
+		totalEvents += len(b.EventChapters)
+		totalGacha += len(b.GachaIds)
 	}
 
-	// Track unique gacha IDs per month (banners can have duplicates)
-	gachaSeenPerMonth := make(map[string]int32Set)
-
-	for _, ban := range banners {
-		if ban.DestinationDomainType != momBannerDomainGacha {
-			continue
-		}
-		month := ContentMonth(ban.StartDatetime)
-
-		if IsUnreleasedContent(ban.StartDatetime) {
-			idx.Unreleased.GachaIds = append(idx.Unreleased.GachaIds, ban.DestinationDomainId)
-			continue
-		}
-
-		b := idx.getOrCreateBundle(month)
-		if gachaSeenPerMonth[month] == nil {
-			gachaSeenPerMonth[month] = make(int32Set)
-		}
-		if !gachaSeenPerMonth[month].contains(ban.DestinationDomainId) {
-			b.GachaIds = append(b.GachaIds, ban.DestinationDomainId)
-			gachaSeenPerMonth[month][ban.DestinationDomainId] = struct{}{}
-		}
-	}
-
-	// --- Login Bonuses ---
-	loginBonuses, err := utils.ReadJSON[loginBonusRow]("EntityMLoginBonusTable.json")
-	if err != nil {
-		log.Printf("[schedule] warning: could not load login bonuses: %v", err)
-	}
-
-	for _, lb := range loginBonuses {
-		month := ContentMonth(lb.StartDatetime)
-
-		if IsUnreleasedContent(lb.StartDatetime) {
-			idx.Unreleased.LoginBonuses = append(idx.Unreleased.LoginBonuses, lb.LoginBonusId)
-			continue
-		}
-
-		b := idx.getOrCreateBundle(month)
-		b.LoginBonuses = append(b.LoginBonuses, lb.LoginBonusId)
-	}
-
-	// --- Side Stories (linked via event chapters) ---
-	ssLimitContent, err := utils.ReadJSON[sideStoryLimitContentRow]("EntityMSideStoryQuestLimitContentTable.json")
-	if err != nil {
-		log.Printf("[schedule] warning: could not load side story limit content: %v", err)
-	}
-
-	for _, ss := range ssLimitContent {
-		month, ok := chapterMonth[ss.EventQuestChapterId]
-		if !ok {
-			continue
-		}
-
-		if IsUnreleasedContent(0) {
-			// Side stories themselves don't have dates; they inherit from their event chapter.
-			// If the chapter is unreleased, so is the side story.
-			if month == ContentMonth(0) {
-				continue
-			}
-		}
-
-		b := idx.getOrCreateBundle(month)
-		b.SideStories = append(b.SideStories, ss.SideStoryQuestLimitContentId)
-	}
-
-	log.Printf("[schedule] bundle index built: %d monthly bundles, %d permanent items, %d unreleased items",
-		len(idx.Bundles),
+	log.Printf("[schedule] bundle index loaded from %s: %d monthly bundles, %d permanent items, %d unreleased items, %d total gacha IDs",
+		path, len(idx.Bundles),
 		len(idx.Permanent.EventChapters),
-		len(idx.Unreleased.EventChapters)+len(idx.Unreleased.GachaIds)+len(idx.Unreleased.LoginBonuses))
+		len(idx.Unreleased.EventChapters)+len(idx.Unreleased.GachaIds)+len(idx.Unreleased.LoginBonuses),
+		totalGacha)
 
-	return idx
-}
-
-func (idx *BundleIndex) getOrCreateBundle(month string) *Bundle {
-	b, ok := idx.Bundles[month]
-	if !ok {
-		b = newBundle(month)
-		idx.Bundles[month] = b
-	}
-	return b
+	return &idx, nil
 }
 
 // AllEnabledEventChapters returns the set of event chapter IDs that should be active

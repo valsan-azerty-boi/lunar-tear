@@ -25,6 +25,7 @@ func main() {
 	publicAddr := flag.String("public-addr", "127.0.0.1:443", "externally-reachable host:port advertised to clients")
 	dbPath := flag.String("db", "db/game.db", "SQLite database path")
 	contentSchedulePath := flag.String("content-schedule", "assets/release/content_schedule.json", "Path to content schedule config")
+	bundleIndexPath := flag.String("bundle-index", "assets/bundle_index.json", "Path to bundle_index.json")
 	octoURL := flag.String("octo-url", "", "Octo CDN base URL the client will use for assets (e.g. http://10.0.2.2:8080)")
 	authURL := flag.String("auth-url", "", "Auth server base URL for Facebook token validation (e.g. http://localhost:3000)")
 	flag.Parse()
@@ -74,7 +75,7 @@ func main() {
 	}
 	log.Printf("gacha catalog loaded: %d entries", len(gachaEntries))
 
-	scheduleManager, err := schedule.NewManager(*contentSchedulePath, gachaEntries)
+	scheduleManager, err := schedule.NewManager(*contentSchedulePath, *bundleIndexPath, gachaEntries)
 	if err != nil {
 		log.Fatalf("load content schedule: %v", err)
 	}
