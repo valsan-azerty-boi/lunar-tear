@@ -20,3 +20,4 @@ func EncodeJSONMaps(records ...map[string]any) (string, error) {
 	}
 	return string(jsonBytes), nil
 }
+

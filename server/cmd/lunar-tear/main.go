@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -14,6 +15,8 @@ import (
 	"lunar-tear/server/internal/masterdata"
 	"lunar-tear/server/internal/masterdata/memorydb"
 	"lunar-tear/server/internal/questflow"
+
+	"lunar-tear/server/internal/schedule"
 	"lunar-tear/server/internal/store/sqlite"
 )
 
@@ -21,6 +24,8 @@ func main() {
 	listen := flag.String("listen", "0.0.0.0:443", "gRPC listen address (host:port)")
 	publicAddr := flag.String("public-addr", "127.0.0.1:443", "externally-reachable host:port advertised to clients")
 	dbPath := flag.String("db", "db/game.db", "SQLite database path")
+	contentSchedulePath := flag.String("content-schedule", "assets/release/content_schedule.json", "Path to content schedule config")
+	bundleIndexPath := flag.String("bundle-index", "assets/bundle_index.json", "Path to bundle_index.json")
 	octoURL := flag.String("octo-url", "", "Octo CDN base URL the client will use for assets (e.g. http://10.0.2.2:8080)")
 	authURL := flag.String("auth-url", "", "Auth server base URL for Facebook token validation (e.g. http://localhost:3000)")
 	flag.Parse()
@@ -29,7 +34,7 @@ func main() {
 		log.Fatalf("--octo-url is required (e.g. http://10.0.2.2:8080)")
 	}
 
-	if err := memorydb.Init("assets/release/20240404193219.bin.e"); err != nil {
+	if err := memorydb.Init("assets/release/database.bin.e"); err != nil {
 		log.Fatalf("load master data: %v", err)
 	}
 	log.Printf("master data loaded (%d tables)", memorydb.TableCount())
@@ -69,6 +74,11 @@ func main() {
 		log.Fatalf("load gacha catalog: %v", err)
 	}
 	log.Printf("gacha catalog loaded: %d entries", len(gachaEntries))
+
+	scheduleManager, err := schedule.NewManager(*contentSchedulePath, *bundleIndexPath, gachaEntries)
+	if err != nil {
+		log.Fatalf("load content schedule: %v", err)
+	}
 
 	gachaPool, err := masterdata.LoadGachaPool()
 	if err != nil {
@@ -168,6 +178,29 @@ func main() {
 	sideStoryCatalog := masterdata.LoadSideStoryCatalog()
 	bigHuntCatalog := masterdata.LoadBigHuntCatalog()
 
+	// Lightweight webhook endpoint for the standalone content-manager to trigger schedule reload.
+	go func() {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/api/admin/reload", func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodPost {
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
+			if err := scheduleManager.Reload(); err != nil {
+				log.Printf("[admin] reload failed: %v", err)
+				http.Error(w, "reload failed", http.StatusInternalServerError)
+				return
+			}
+			log.Println("[admin] schedule reloaded via webhook")
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"ok": true}`))
+		})
+		log.Println("[admin] webhook listener on :8082")
+		if err := http.ListenAndServe(":8082", mux); err != nil {
+			log.Printf("[admin] webhook listener failed: %v", err)
+		}
+	}()
+
 	grpcServer := startGRPC(
 		*listen,
 		*publicAddr,
@@ -176,7 +209,7 @@ func main() {
 		userStore,
 		questHandler,
 		gachaHandler,
-		gachaEntries,
+		scheduleManager,
 		cageOrnamentCatalog,
 		loginBonusCatalog,
 		characterViewerCatalog,

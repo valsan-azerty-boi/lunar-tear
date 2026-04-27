@@ -121,7 +121,7 @@ type assetCheck struct {
 
 var requiredAssets = []assetCheck{
 	{"assets", true},
-	{"assets/release/20240404193219.bin.e", false},
+	{"assets/release/database.bin.e", false},
 	{"assets/revisions/0/list.bin", false},
 	{"assets/revisions/0/assetbundle", true},
 	{"assets/revisions/0/resources", true},
