@@ -10,6 +10,7 @@ import (
 	"lunar-tear/server/internal/interceptor"
 	"lunar-tear/server/internal/masterdata"
 	"lunar-tear/server/internal/questflow"
+	"lunar-tear/server/internal/schedule"
 	"lunar-tear/server/internal/service"
 	"lunar-tear/server/internal/store"
 
@@ -42,7 +43,7 @@ func startGRPC(
 	},
 	questEngine *questflow.QuestHandler,
 	gachaHandler *gacha.GachaHandler,
-	gachaEntries []store.GachaCatalogEntry,
+	scheduleManager *schedule.Manager,
 	cageOrnamentCatalog *masterdata.CageOrnamentCatalog,
 	loginBonusCatalog *masterdata.LoginBonusCatalog,
 	characterViewerCatalog *masterdata.CharacterViewerCatalog,
@@ -81,7 +82,7 @@ func startGRPC(
 		userStore,
 		questEngine,
 		gachaHandler,
-		gachaEntries,
+		scheduleManager,
 		cageOrnamentCatalog,
 		loginBonusCatalog,
 		characterViewerCatalog,
@@ -126,7 +127,7 @@ func registerServices(
 	},
 	questEngine *questflow.QuestHandler,
 	gachaHandler *gacha.GachaHandler,
-	gachaEntries []store.GachaCatalogEntry,
+	scheduleManager *schedule.Manager,
 	cageOrnamentCatalog *masterdata.CageOrnamentCatalog,
 	loginBonusCatalog *masterdata.LoginBonusCatalog,
 	characterViewerCatalog *masterdata.CharacterViewerCatalog,
@@ -149,13 +150,13 @@ func registerServices(
 	pubHost, pubPortStr, _ := net.SplitHostPort(publicAddr)
 	pubPort, _ := strconv.Atoi(pubPortStr)
 
-	pb.RegisterBannerServiceServer(srv, service.NewBannerServiceServer(gachaEntries))
+	pb.RegisterBannerServiceServer(srv, service.NewBannerServiceServer(scheduleManager))
 	pb.RegisterUserServiceServer(srv, service.NewUserServiceServer(userStore, userStore, authURL))
 	pb.RegisterBattleServiceServer(srv, service.NewBattleServiceServer(userStore, userStore))
 	pb.RegisterConfigServiceServer(srv, service.NewConfigServiceServer(pubHost, int32(pubPort), octoURL))
-	pb.RegisterDataServiceServer(srv, service.NewDataServiceServer(userStore, userStore))
+	pb.RegisterDataServiceServer(srv, service.NewDataServiceServer(userStore, userStore, scheduleManager))
 	pb.RegisterTutorialServiceServer(srv, service.NewTutorialServiceServer(userStore, userStore, questEngine))
-	pb.RegisterGachaServiceServer(srv, service.NewGachaServiceServer(userStore, userStore, gachaEntries, gachaHandler))
+	pb.RegisterGachaServiceServer(srv, service.NewGachaServiceServer(userStore, userStore, scheduleManager, gachaHandler))
 	pb.RegisterGiftServiceServer(srv, service.NewGiftServiceServer(userStore, userStore))
 	pb.RegisterGamePlayServiceServer(srv, service.NewGameplayServiceServer())
 	pb.RegisterGimmickServiceServer(srv, service.NewGimmickServiceServer(userStore, userStore, gimmickCatalog))
