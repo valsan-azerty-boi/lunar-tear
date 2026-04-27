@@ -122,23 +122,62 @@ type assetCheck struct {
 var requiredAssets = []assetCheck{
 	{"assets", true},
 	{"assets/release/20240404193219.bin.e", false},
-	{"assets/revisions/0/list.bin", false},
-	{"assets/revisions/0/assetbundle", true},
-	{"assets/revisions/0/resources", true},
+}
+
+// platformAssets holds the per-platform rev-0 layout. At least one full set
+// must be present; users may have only Android or only iOS extracted.
+var platformAssets = [][]assetCheck{
+	{
+		{"assets/revisions/0/android/list.bin", false},
+		{"assets/revisions/0/android/assetbundle", true},
+		{"assets/revisions/0/android/resources", true},
+	},
+	{
+		{"assets/revisions/0/ios/list.bin", false},
+		{"assets/revisions/0/ios/assetbundle", true},
+		{"assets/revisions/0/ios/resources", true},
+	},
+}
+
+func checkAsset(a assetCheck) (missing string, ok bool) {
+	info, err := os.Stat(a.path)
+	if err != nil {
+		return a.path, false
+	}
+	if a.dir && !info.IsDir() {
+		return a.path + string(filepath.Separator), false
+	}
+	if !a.dir && info.IsDir() {
+		return a.path, false
+	}
+	return "", true
 }
 
 func validateAssets() {
 	var missing []string
 	for _, a := range requiredAssets {
-		info, err := os.Stat(a.path)
-		if err != nil {
-			missing = append(missing, a.path)
-			continue
+		if m, ok := checkAsset(a); !ok {
+			missing = append(missing, m)
 		}
-		if a.dir && !info.IsDir() {
-			missing = append(missing, a.path+string(filepath.Separator))
-		} else if !a.dir && info.IsDir() {
-			missing = append(missing, a.path)
+	}
+
+	var platformMissing [][]string
+	anyPlatformOK := false
+	for _, group := range platformAssets {
+		var groupMissing []string
+		for _, a := range group {
+			if m, ok := checkAsset(a); !ok {
+				groupMissing = append(groupMissing, m)
+			}
+		}
+		if len(groupMissing) == 0 {
+			anyPlatformOK = true
+		}
+		platformMissing = append(platformMissing, groupMissing)
+	}
+	if !anyPlatformOK {
+		for _, gm := range platformMissing {
+			missing = append(missing, gm...)
 		}
 	}
 
@@ -160,6 +199,8 @@ func validateAssets() {
 	}
 	b.WriteString("\n")
 	b.WriteString(dimStyle.Render("  Place the extracted game assets under server/assets/ and try again."))
+	b.WriteString("\n")
+	b.WriteString(dimStyle.Render("  At least one of assets/revisions/0/android/ or assets/revisions/0/ios/ must be fully present."))
 	b.WriteString("\n")
 	b.WriteString(dimStyle.Render("  Get them from ") + hlStyle.Render("#resources") + dimStyle.Render(" on Discord: ") + hlStyle.Hyperlink("https://discord.com/invite/MZAf5aVkJG").Render("https://discord.com/invite/MZAf5aVkJG"))
 	b.WriteString("\n")
