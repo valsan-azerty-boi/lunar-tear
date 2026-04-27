@@ -10,7 +10,6 @@ import (
 	"lunar-tear/server/internal/masterdata"
 	"lunar-tear/server/internal/model"
 	"lunar-tear/server/internal/store"
-	"lunar-tear/server/internal/userdata"
 )
 
 const (
@@ -18,18 +17,6 @@ const (
 	exploreRewardMaterialId = 100001
 	exploreRewardBaseCount  = 1
 )
-
-var exploreDiffTables = []string{
-	"IUserExplore",
-	"IUserExploreScore",
-}
-
-var exploreFinishDiffTables = []string{
-	"IUserExplore",
-	"IUserExploreScore",
-	"IUserMaterial",
-	"IUserStatus",
-}
 
 type ExploreServiceServer struct {
 	pb.UnimplementedExploreServiceServer
@@ -49,10 +36,10 @@ func (s *ExploreServiceServer) StartExplore(ctx context.Context, req *pb.StartEx
 		return nil, fmt.Errorf("explore id=%d not found", req.ExploreId)
 	}
 
-	userId := currentUserId(ctx, s.users, s.sessions)
+	userId := CurrentUserId(ctx, s.users, s.sessions)
 	nowMillis := gametime.NowMillis()
 
-	snapshot, err := s.users.UpdateUser(userId, func(user *store.UserState) {
+	_, err := s.users.UpdateUser(userId, func(user *store.UserState) {
 		explore := s.catalog.Explores[req.ExploreId]
 		if req.UseConsumableItemId > 0 && explore.ConsumeItemCount > 0 {
 			cur := user.ConsumableItems[req.UseConsumableItemId]
@@ -71,11 +58,7 @@ func (s *ExploreServiceServer) StartExplore(ctx context.Context, req *pb.StartEx
 		return nil, fmt.Errorf("start explore: %w", err)
 	}
 
-	diff := userdata.BuildDiffFromTables(userdata.ProjectTables(snapshot, exploreDiffTables))
-
-	return &pb.StartExploreResponse{
-		DiffUserData: diff,
-	}, nil
+	return &pb.StartExploreResponse{}, nil
 }
 
 func (s *ExploreServiceServer) FinishExplore(ctx context.Context, req *pb.FinishExploreRequest) (*pb.FinishExploreResponse, error) {
@@ -88,12 +71,12 @@ func (s *ExploreServiceServer) FinishExplore(ctx context.Context, req *pb.Finish
 
 	assetGradeIconId := s.catalog.GradeForScore(req.ExploreId, req.Score)
 
-	userId := currentUserId(ctx, s.users, s.sessions)
+	userId := CurrentUserId(ctx, s.users, s.sessions)
 	nowMillis := gametime.NowMillis()
 
 	rewardCount := int32(exploreRewardBaseCount) * explore.RewardLotteryCount
 
-	snapshot, err := s.users.UpdateUser(userId, func(user *store.UserState) {
+	_, err := s.users.UpdateUser(userId, func(user *store.UserState) {
 		existing, exists := user.ExploreScores[req.ExploreId]
 		if !exists || req.Score > existing.MaxScore {
 			user.ExploreScores[req.ExploreId] = store.ExploreScoreState{
@@ -123,8 +106,6 @@ func (s *ExploreServiceServer) FinishExplore(ctx context.Context, req *pb.Finish
 		return nil, fmt.Errorf("finish explore: %w", err)
 	}
 
-	diff := userdata.BuildDiffFromTables(userdata.ProjectTables(snapshot, exploreFinishDiffTables))
-
 	rewards := []*pb.ExploreReward{
 		{
 			PossessionType: int32(model.PossessionTypeMaterial),
@@ -137,17 +118,16 @@ func (s *ExploreServiceServer) FinishExplore(ctx context.Context, req *pb.Finish
 		AcquireStaminaCount: exploreStaminaRecovery,
 		ExploreReward:       rewards,
 		AssetGradeIconId:    assetGradeIconId,
-		DiffUserData:        diff,
 	}, nil
 }
 
 func (s *ExploreServiceServer) RetireExplore(ctx context.Context, req *pb.RetireExploreRequest) (*pb.RetireExploreResponse, error) {
 	log.Printf("[ExploreService] RetireExplore: exploreId=%d", req.ExploreId)
 
-	userId := currentUserId(ctx, s.users, s.sessions)
+	userId := CurrentUserId(ctx, s.users, s.sessions)
 	nowMillis := gametime.NowMillis()
 
-	snapshot, err := s.users.UpdateUser(userId, func(user *store.UserState) {
+	_, err := s.users.UpdateUser(userId, func(user *store.UserState) {
 		user.Explore = store.ExploreState{
 			PlayingExploreId:   0,
 			IsUseExploreTicket: false,
@@ -159,9 +139,5 @@ func (s *ExploreServiceServer) RetireExplore(ctx context.Context, req *pb.Retire
 		return nil, fmt.Errorf("retire explore: %w", err)
 	}
 
-	diff := userdata.BuildDiffFromTables(userdata.ProjectTables(snapshot, []string{"IUserExplore"}))
-
-	return &pb.RetireExploreResponse{
-		DiffUserData: diff,
-	}, nil
+	return &pb.RetireExploreResponse{}, nil
 }

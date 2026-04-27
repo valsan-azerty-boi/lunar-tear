@@ -5,18 +5,6 @@ import (
 	"lunar-tear/server/internal/utils"
 )
 
-type cageOrnament struct {
-	CageOrnamentId       int32 `json:"CageOrnamentId"`
-	CageOrnamentRewardId int32 `json:"CageOrnamentRewardId"`
-}
-
-type cageOrnamentRewardRow struct {
-	CageOrnamentRewardId int32 `json:"CageOrnamentRewardId"`
-	PossessionType       int32 `json:"PossessionType"`
-	PossessionId         int32 `json:"PossessionId"`
-	Count                int32 `json:"Count"`
-}
-
 type CageOrnamentReward struct {
 	PossessionType int32
 	PossessionId   int32
@@ -38,11 +26,11 @@ func (c *CageOrnamentCatalog) LookupReward(cageOrnamentId int32) (CageOrnamentRe
 }
 
 func LoadCageOrnamentCatalog() *CageOrnamentCatalog {
-	ornaments, err := utils.ReadJSON[cageOrnament]("EntityMCageOrnamentTable.json")
+	ornaments, err := utils.ReadTable[EntityMCageOrnament]("m_cage_ornament")
 	if err != nil {
 		log.Fatalf("load cage ornament table: %v", err)
 	}
-	rewards, err := utils.ReadJSON[cageOrnamentRewardRow]("EntityMCageOrnamentRewardTable.json")
+	rewards, err := utils.ReadTable[EntityMCageOrnamentReward]("m_cage_ornament_reward")
 	if err != nil {
 		log.Fatalf("load cage ornament reward table: %v", err)
 	}

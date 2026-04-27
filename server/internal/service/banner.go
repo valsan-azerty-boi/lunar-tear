@@ -6,7 +6,6 @@ import (
 	pb "lunar-tear/server/gen/proto"
 	"lunar-tear/server/internal/model"
 	"lunar-tear/server/internal/store"
-	"lunar-tear/server/internal/userdata"
 )
 
 type BannerServiceServer struct {
@@ -44,6 +43,5 @@ func (s *BannerServiceServer) GetMamaBanner(ctx context.Context, req *pb.GetMama
 		TermLimitedGacha:   termLimited,
 		LatestChapterGacha: latestChapter,
 		IsExistUnreadPop:   false,
-		DiffUserData:       userdata.EmptyDiff(),
 	}, nil
 }

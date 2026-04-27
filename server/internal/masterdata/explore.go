@@ -7,48 +7,31 @@ import (
 	"lunar-tear/server/internal/utils"
 )
 
-type ExploreRow struct {
-	ExploreId          int32 `json:"ExploreId"`
-	ConsumeItemCount   int32 `json:"ConsumeItemCount"`
-	RewardLotteryCount int32 `json:"RewardLotteryCount"`
-}
-
-type ExploreGradeScoreRow struct {
-	ExploreId      int32 `json:"ExploreId"`
-	NecessaryScore int32 `json:"NecessaryScore"`
-	ExploreGradeId int32 `json:"ExploreGradeId"`
-}
-
-type ExploreGradeAssetRow struct {
-	ExploreGradeId   int32 `json:"ExploreGradeId"`
-	AssetGradeIconId int32 `json:"AssetGradeIconId"`
-}
-
 type ExploreCatalog struct {
-	Explores    map[int32]ExploreRow
-	GradeScores map[int32][]ExploreGradeScoreRow // keyed by ExploreId, sorted desc by NecessaryScore
-	GradeAssets map[int32]int32                  // gradeId -> assetGradeIconId
+	Explores    map[int32]EntityMExplore
+	GradeScores map[int32][]EntityMExploreGradeScore // keyed by ExploreId, sorted desc by NecessaryScore
+	GradeAssets map[int32]int32                      // gradeId -> assetGradeIconId
 }
 
 func LoadExploreCatalog() (*ExploreCatalog, error) {
-	explores, err := utils.ReadJSON[ExploreRow]("EntityMExploreTable.json")
+	explores, err := utils.ReadTable[EntityMExplore]("m_explore")
 	if err != nil {
 		return nil, fmt.Errorf("load explore table: %w", err)
 	}
 
-	gradeScores, err := utils.ReadJSON[ExploreGradeScoreRow]("EntityMExploreGradeScoreTable.json")
+	gradeScores, err := utils.ReadTable[EntityMExploreGradeScore]("m_explore_grade_score")
 	if err != nil {
 		return nil, fmt.Errorf("load explore grade score table: %w", err)
 	}
 
-	gradeAssets, err := utils.ReadJSON[ExploreGradeAssetRow]("EntityMExploreGradeAssetTable.json")
+	gradeAssets, err := utils.ReadTable[EntityMExploreGradeAsset]("m_explore_grade_asset")
 	if err != nil {
 		return nil, fmt.Errorf("load explore grade asset table: %w", err)
 	}
 
 	catalog := &ExploreCatalog{
-		Explores:    make(map[int32]ExploreRow, len(explores)),
-		GradeScores: make(map[int32][]ExploreGradeScoreRow),
+		Explores:    make(map[int32]EntityMExplore, len(explores)),
+		GradeScores: make(map[int32][]EntityMExploreGradeScore),
 		GradeAssets: make(map[int32]int32, len(gradeAssets)),
 	}
 

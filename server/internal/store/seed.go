@@ -16,13 +16,13 @@ const (
 	defaultChargeMoneyThisMonth = int64(0)
 )
 
-func SeedUserState(userId int64, uuid string, nowMillis int64) *UserState {
+func SeedUserState(userId int64, uuid string, nowMillis int64, platform model.ClientPlatform) *UserState {
 	user := &UserState{
 		UserId:               userId,
 		Uuid:                 uuid,
 		PlayerId:             userId,
-		OsType:               2,
-		PlatformType:         2,
+		OsType:               platform.OsType,
+		PlatformType:         platform.PlatformType,
 		UserRestrictionType:  0,
 		RegisterDatetime:     nowMillis,
 		GameStartDatetime:    nowMillis,
@@ -129,6 +129,7 @@ func SeedUserState(userId int64, uuid string, nowMillis int64) *UserState {
 		Parts:                 make(map[string]PartsState),
 		PartsGroupNotes:       make(map[int32]PartsGroupNoteState),
 		PartsPresets:          make(map[int32]PartsPresetState),
+		PartsStatusSubs:       make(map[PartsStatusSubKey]PartsStatusSubState),
 		ImportantItems:        make(map[int32]int32),
 		CostumeActiveSkills:   make(map[string]CostumeActiveSkillState),
 		WeaponSkills:          make(map[string][]WeaponSkillState),

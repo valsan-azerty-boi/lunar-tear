@@ -5,15 +5,6 @@ import (
 	"lunar-tear/server/internal/utils"
 )
 
-type loginBonusStamp struct {
-	LoginBonusId         int32 `json:"LoginBonusId"`
-	LowerPageNumber      int32 `json:"LowerPageNumber"`
-	StampNumber          int32 `json:"StampNumber"`
-	RewardPossessionType int32 `json:"RewardPossessionType"`
-	RewardPossessionId   int32 `json:"RewardPossessionId"`
-	RewardCount          int32 `json:"RewardCount"`
-}
-
 type loginBonusStampKey struct {
 	LoginBonusId    int32
 	LowerPageNumber int32
@@ -36,7 +27,7 @@ func (c *LoginBonusCatalog) LookupStampReward(loginBonusId, pageNumber, stampNum
 }
 
 func LoadLoginBonusCatalog() *LoginBonusCatalog {
-	stamps, err := utils.ReadJSON[loginBonusStamp]("EntityMLoginBonusStampTable.json")
+	stamps, err := utils.ReadTable[EntityMLoginBonusStamp]("m_login_bonus_stamp")
 	if err != nil {
 		log.Fatalf("load login bonus stamp table: %v", err)
 	}

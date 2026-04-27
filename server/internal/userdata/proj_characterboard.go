@@ -4,19 +4,20 @@ import (
 	"sort"
 
 	"lunar-tear/server/internal/store"
+	"lunar-tear/server/internal/utils"
 )
 
 func init() {
 	register("IUserCharacterBoard", func(user store.UserState) string {
-		s, _ := encodeJSONMaps(sortedCharacterBoardRecords(user)...)
+		s, _ := utils.EncodeJSONMaps(sortedCharacterBoardRecords(user)...)
 		return s
 	})
 	register("IUserCharacterBoardAbility", func(user store.UserState) string {
-		s, _ := encodeJSONMaps(sortedCharacterBoardAbilityRecords(user)...)
+		s, _ := utils.EncodeJSONMaps(sortedCharacterBoardAbilityRecords(user)...)
 		return s
 	})
 	register("IUserCharacterBoardStatusUp", func(user store.UserState) string {
-		s, _ := encodeJSONMaps(sortedCharacterBoardStatusUpRecords(user)...)
+		s, _ := utils.EncodeJSONMaps(sortedCharacterBoardStatusUpRecords(user)...)
 		return s
 	})
 	registerStatic("IUserCharacterBoardCompleteReward")

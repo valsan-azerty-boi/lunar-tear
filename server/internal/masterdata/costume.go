@@ -8,132 +8,37 @@ import (
 	"lunar-tear/server/internal/utils"
 )
 
-type CostumeMasterRow struct {
-	CostumeId                        int32 `json:"CostumeId"`
-	CharacterId                      int32 `json:"CharacterId"`
-	SkillfulWeaponType               int32 `json:"SkillfulWeaponType"`
-	RarityType                       int32 `json:"RarityType"`
-	CostumeLimitBreakMaterialGroupId int32 `json:"CostumeLimitBreakMaterialGroupId"`
-	CostumeActiveSkillGroupId        int32 `json:"CostumeActiveSkillGroupId"`
-}
-
-type costumeRarityRow struct {
-	RarityType                                    int32 `json:"RarityType"`
-	CostumeLimitBreakMaterialRarityGroupId        int32 `json:"CostumeLimitBreakMaterialRarityGroupId"`
-	RequiredExpForLevelUpNumericalParameterMapId  int32 `json:"RequiredExpForLevelUpNumericalParameterMapId"`
-	EnhancementCostByMaterialNumericalFunctionId  int32 `json:"EnhancementCostByMaterialNumericalFunctionId"`
-	LimitBreakCostNumericalFunctionId             int32 `json:"LimitBreakCostNumericalFunctionId"`
-	MaxLevelNumericalFunctionId                   int32 `json:"MaxLevelNumericalFunctionId"`
-	ActiveSkillMaxLevelNumericalFunctionId        int32 `json:"ActiveSkillMaxLevelNumericalFunctionId"`
-	ActiveSkillEnhancementCostNumericalFunctionId int32 `json:"ActiveSkillEnhancementCostNumericalFunctionId"`
-}
-
-type CostumeAwakenRow struct {
-	CostumeId                        int32 `json:"CostumeId"`
-	CostumeAwakenEffectGroupId       int32 `json:"CostumeAwakenEffectGroupId"`
-	CostumeAwakenStepMaterialGroupId int32 `json:"CostumeAwakenStepMaterialGroupId"`
-	CostumeAwakenPriceGroupId        int32 `json:"CostumeAwakenPriceGroupId"`
-}
-
-type costumeAwakenPriceRow struct {
-	CostumeAwakenPriceGroupId int32 `json:"CostumeAwakenPriceGroupId"`
-	AwakenStepLowerLimit      int32 `json:"AwakenStepLowerLimit"`
-	Gold                      int32 `json:"Gold"`
-}
-
-type CostumeAwakenEffectRow struct {
-	CostumeAwakenEffectGroupId int32 `json:"CostumeAwakenEffectGroupId"`
-	AwakenStep                 int32 `json:"AwakenStep"`
-	CostumeAwakenEffectType    int32 `json:"CostumeAwakenEffectType"`
-	CostumeAwakenEffectId      int32 `json:"CostumeAwakenEffectId"`
-}
-
-type CostumeAwakenStatusUpRow struct {
-	CostumeAwakenStatusUpGroupId int32 `json:"CostumeAwakenStatusUpGroupId"`
-	SortOrder                    int32 `json:"SortOrder"`
-	StatusKindType               int32 `json:"StatusKindType"`
-	StatusCalculationType        int32 `json:"StatusCalculationType"`
-	EffectValue                  int32 `json:"EffectValue"`
-}
-
-type CostumeAwakenItemAcquireRow struct {
-	CostumeAwakenItemAcquireId int32 `json:"CostumeAwakenItemAcquireId"`
-	PossessionType             int32 `json:"PossessionType"`
-	PossessionId               int32 `json:"PossessionId"`
-	Count                      int32 `json:"Count"`
-}
-
-type CostumeActiveSkillGroupRow struct {
-	CostumeActiveSkillGroupId               int32 `json:"CostumeActiveSkillGroupId"`
-	CostumeLimitBreakCountLowerLimit        int32 `json:"CostumeLimitBreakCountLowerLimit"`
-	CostumeActiveSkillId                    int32 `json:"CostumeActiveSkillId"`
-	CostumeActiveSkillEnhancementMaterialId int32 `json:"CostumeActiveSkillEnhancementMaterialId"`
-}
-
-type CostumeActiveSkillEnhanceMaterialRow struct {
-	CostumeActiveSkillEnhancementMaterialId int32 `json:"CostumeActiveSkillEnhancementMaterialId"`
-	SkillLevel                              int32 `json:"SkillLevel"`
-	MaterialId                              int32 `json:"MaterialId"`
-	Count                                   int32 `json:"Count"`
-	SortOrder                               int32 `json:"SortOrder"`
-}
-
-type CostumeLotteryEffectRow struct {
-	CostumeId                                 int32 `json:"CostumeId"`
-	SlotNumber                                int32 `json:"SlotNumber"`
-	CostumeLotteryEffectOddsGroupId           int32 `json:"CostumeLotteryEffectOddsGroupId"`
-	CostumeLotteryEffectUnlockMaterialGroupId int32 `json:"CostumeLotteryEffectUnlockMaterialGroupId"`
-	CostumeLotteryEffectDrawMaterialGroupId   int32 `json:"CostumeLotteryEffectDrawMaterialGroupId"`
-	CostumeLotteryEffectReleaseScheduleId     int32 `json:"CostumeLotteryEffectReleaseScheduleId"`
-}
-
-type CostumeLotteryEffectMaterialGroupRow struct {
-	CostumeLotteryEffectMaterialGroupId int32 `json:"CostumeLotteryEffectMaterialGroupId"`
-	MaterialId                          int32 `json:"MaterialId"`
-	Count                               int32 `json:"Count"`
-	SortOrder                           int32 `json:"SortOrder"`
-}
-
-type CostumeLotteryEffectOddsRow struct {
-	CostumeLotteryEffectOddsGroupId int32 `json:"CostumeLotteryEffectOddsGroupId"`
-	OddsNumber                      int32 `json:"OddsNumber"`
-	Weight                          int32 `json:"Weight"`
-	CostumeLotteryEffectType        int32 `json:"CostumeLotteryEffectType"`
-	CostumeLotteryEffectTargetId    int32 `json:"CostumeLotteryEffectTargetId"`
-	RarityType                      int32 `json:"RarityType"`
-}
-
 type CostumeCatalog struct {
-	Costumes               map[int32]CostumeMasterRow
-	Materials              map[int32]MaterialRow
+	Costumes               map[int32]EntityMCostume
+	Materials              map[int32]EntityMMaterial
 	ExpByRarity            map[int32][]int32
 	EnhanceCostByRarity    map[int32]NumericalFunc
 	MaxLevelByRarity       map[int32]NumericalFunc
 	LimitBreakCostByRarity map[int32]NumericalFunc
 
-	AwakenByCostumeId           map[int32]CostumeAwakenRow
+	AwakenByCostumeId           map[int32]EntityMCostumeAwaken
 	AwakenPriceByGroup          map[int32]int32
-	AwakenEffectsByGroupAndStep map[int32]map[int32]CostumeAwakenEffectRow
-	AwakenStatusUpByGroup       map[int32][]CostumeAwakenStatusUpRow
-	AwakenItemAcquireById       map[int32]CostumeAwakenItemAcquireRow
+	AwakenEffectsByGroupAndStep map[int32]map[int32]EntityMCostumeAwakenEffectGroup
+	AwakenStatusUpByGroup       map[int32][]EntityMCostumeAwakenStatusUpGroup
+	AwakenItemAcquireById       map[int32]EntityMCostumeAwakenItemAcquire
 
-	ActiveSkillGroupsByGroupId  map[int32][]CostumeActiveSkillGroupRow              // sorted by CostumeLimitBreakCountLowerLimit desc
-	ActiveSkillEnhanceMats      map[[2]int32][]CostumeActiveSkillEnhanceMaterialRow // key: [enhancementMaterialId, skillLevel]
+	ActiveSkillGroupsByGroupId  map[int32][]EntityMCostumeActiveSkillGroup                  // sorted by CostumeLimitBreakCountLowerLimit desc
+	ActiveSkillEnhanceMats      map[[2]int32][]EntityMCostumeActiveSkillEnhancementMaterial // key: [enhancementMaterialId, skillLevel]
 	ActiveSkillMaxLevelByRarity map[int32]NumericalFunc
 	ActiveSkillCostByRarity     map[int32]NumericalFunc
 
-	LotteryEffects    map[[2]int32]CostumeLotteryEffectRow             // key: [costumeId, slotNumber]
-	LotteryEffectMats map[int32][]CostumeLotteryEffectMaterialGroupRow // key: materialGroupId (both unlock and draw)
-	LotteryEffectOdds map[int32][]CostumeLotteryEffectOddsRow          // key: oddsGroupId
+	LotteryEffects    map[[2]int32]EntityMCostumeLotteryEffect             // key: [costumeId, slotNumber]
+	LotteryEffectMats map[int32][]EntityMCostumeLotteryEffectMaterialGroup // key: materialGroupId (both unlock and draw)
+	LotteryEffectOdds map[int32][]EntityMCostumeLotteryEffectOddsGroup     // key: oddsGroupId
 }
 
 func LoadCostumeCatalog(matCatalog *MaterialCatalog) (*CostumeCatalog, error) {
-	costumes, err := utils.ReadJSON[CostumeMasterRow]("EntityMCostumeTable.json")
+	costumes, err := utils.ReadTable[EntityMCostume]("m_costume")
 	if err != nil {
 		return nil, fmt.Errorf("load costume table: %w", err)
 	}
 
-	rarities, err := utils.ReadJSON[costumeRarityRow]("EntityMCostumeRarityTable.json")
+	rarities, err := utils.ReadTable[EntityMCostumeRarity]("m_costume_rarity")
 	if err != nil {
 		return nil, fmt.Errorf("load costume rarity table: %w", err)
 	}
@@ -148,71 +53,71 @@ func LoadCostumeCatalog(matCatalog *MaterialCatalog) (*CostumeCatalog, error) {
 		return nil, fmt.Errorf("load function resolver: %w", err)
 	}
 
-	awakenRows, err := utils.ReadJSON[CostumeAwakenRow]("EntityMCostumeAwakenTable.json")
+	awakenRows, err := utils.ReadTable[EntityMCostumeAwaken]("m_costume_awaken")
 	if err != nil {
 		return nil, fmt.Errorf("load costume awaken table: %w", err)
 	}
-	awakenPriceRows, err := utils.ReadJSON[costumeAwakenPriceRow]("EntityMCostumeAwakenPriceGroupTable.json")
+	awakenPriceRows, err := utils.ReadTable[EntityMCostumeAwakenPriceGroup]("m_costume_awaken_price_group")
 	if err != nil {
 		return nil, fmt.Errorf("load costume awaken price table: %w", err)
 	}
-	awakenEffectRows, err := utils.ReadJSON[CostumeAwakenEffectRow]("EntityMCostumeAwakenEffectGroupTable.json")
+	awakenEffectRows, err := utils.ReadTable[EntityMCostumeAwakenEffectGroup]("m_costume_awaken_effect_group")
 	if err != nil {
 		return nil, fmt.Errorf("load costume awaken effect table: %w", err)
 	}
-	awakenStatusUpRows, err := utils.ReadJSON[CostumeAwakenStatusUpRow]("EntityMCostumeAwakenStatusUpGroupTable.json")
+	awakenStatusUpRows, err := utils.ReadTable[EntityMCostumeAwakenStatusUpGroup]("m_costume_awaken_status_up_group")
 	if err != nil {
 		return nil, fmt.Errorf("load costume awaken status up table: %w", err)
 	}
-	awakenItemAcquireRows, err := utils.ReadJSON[CostumeAwakenItemAcquireRow]("EntityMCostumeAwakenItemAcquireTable.json")
+	awakenItemAcquireRows, err := utils.ReadTable[EntityMCostumeAwakenItemAcquire]("m_costume_awaken_item_acquire")
 	if err != nil {
 		return nil, fmt.Errorf("load costume awaken item acquire table: %w", err)
 	}
 
-	activeSkillGroupRows, err := utils.ReadJSON[CostumeActiveSkillGroupRow]("EntityMCostumeActiveSkillGroupTable.json")
+	activeSkillGroupRows, err := utils.ReadTable[EntityMCostumeActiveSkillGroup]("m_costume_active_skill_group")
 	if err != nil {
 		return nil, fmt.Errorf("load costume active skill group table: %w", err)
 	}
-	activeSkillMatRows, err := utils.ReadJSON[CostumeActiveSkillEnhanceMaterialRow]("EntityMCostumeActiveSkillEnhancementMaterialTable.json")
+	activeSkillMatRows, err := utils.ReadTable[EntityMCostumeActiveSkillEnhancementMaterial]("m_costume_active_skill_enhancement_material")
 	if err != nil {
 		return nil, fmt.Errorf("load costume active skill enhancement material table: %w", err)
 	}
 
-	lotteryEffectRows, err := utils.ReadJSON[CostumeLotteryEffectRow]("EntityMCostumeLotteryEffectTable.json")
+	lotteryEffectRows, err := utils.ReadTable[EntityMCostumeLotteryEffect]("m_costume_lottery_effect")
 	if err != nil {
 		return nil, fmt.Errorf("load costume lottery effect table: %w", err)
 	}
-	lotteryEffectMatRows, err := utils.ReadJSON[CostumeLotteryEffectMaterialGroupRow]("EntityMCostumeLotteryEffectMaterialGroupTable.json")
+	lotteryEffectMatRows, err := utils.ReadTable[EntityMCostumeLotteryEffectMaterialGroup]("m_costume_lottery_effect_material_group")
 	if err != nil {
 		return nil, fmt.Errorf("load costume lottery effect material group table: %w", err)
 	}
-	lotteryEffectOddsRows, err := utils.ReadJSON[CostumeLotteryEffectOddsRow]("EntityMCostumeLotteryEffectOddsGroupTable.json")
+	lotteryEffectOddsRows, err := utils.ReadTable[EntityMCostumeLotteryEffectOddsGroup]("m_costume_lottery_effect_odds_group")
 	if err != nil {
 		return nil, fmt.Errorf("load costume lottery effect odds group table: %w", err)
 	}
 
 	catalog := &CostumeCatalog{
-		Costumes:               make(map[int32]CostumeMasterRow, len(costumes)),
+		Costumes:               make(map[int32]EntityMCostume, len(costumes)),
 		Materials:              matCatalog.ByType[model.MaterialTypeCostumeEnhancement],
 		ExpByRarity:            make(map[int32][]int32, len(rarities)),
 		EnhanceCostByRarity:    make(map[int32]NumericalFunc, len(rarities)),
 		MaxLevelByRarity:       make(map[int32]NumericalFunc, len(rarities)),
 		LimitBreakCostByRarity: make(map[int32]NumericalFunc, len(rarities)),
 
-		AwakenByCostumeId:           make(map[int32]CostumeAwakenRow, len(awakenRows)),
+		AwakenByCostumeId:           make(map[int32]EntityMCostumeAwaken, len(awakenRows)),
 		AwakenPriceByGroup:          make(map[int32]int32, len(awakenPriceRows)),
-		AwakenEffectsByGroupAndStep: make(map[int32]map[int32]CostumeAwakenEffectRow),
-		AwakenStatusUpByGroup:       make(map[int32][]CostumeAwakenStatusUpRow),
-		AwakenItemAcquireById:       make(map[int32]CostumeAwakenItemAcquireRow, len(awakenItemAcquireRows)),
+		AwakenEffectsByGroupAndStep: make(map[int32]map[int32]EntityMCostumeAwakenEffectGroup),
+		AwakenStatusUpByGroup:       make(map[int32][]EntityMCostumeAwakenStatusUpGroup),
+		AwakenItemAcquireById:       make(map[int32]EntityMCostumeAwakenItemAcquire, len(awakenItemAcquireRows)),
 
-		ActiveSkillGroupsByGroupId:  make(map[int32][]CostumeActiveSkillGroupRow),
-		ActiveSkillEnhanceMats:      make(map[[2]int32][]CostumeActiveSkillEnhanceMaterialRow),
+		ActiveSkillGroupsByGroupId:  make(map[int32][]EntityMCostumeActiveSkillGroup),
+		ActiveSkillEnhanceMats:      make(map[[2]int32][]EntityMCostumeActiveSkillEnhancementMaterial),
 		ActiveSkillMaxLevelByRarity: make(map[int32]NumericalFunc, len(rarities)),
 		ActiveSkillCostByRarity:     make(map[int32]NumericalFunc, len(rarities)),
 
-		LotteryEffects:    make(map[[2]int32]CostumeLotteryEffectRow, len(lotteryEffectRows)),
-		LotteryEffectMats: make(map[int32][]CostumeLotteryEffectMaterialGroupRow),
-		LotteryEffectOdds: make(map[int32][]CostumeLotteryEffectOddsRow),
+		LotteryEffects:    make(map[[2]int32]EntityMCostumeLotteryEffect, len(lotteryEffectRows)),
+		LotteryEffectMats: make(map[int32][]EntityMCostumeLotteryEffectMaterialGroup),
+		LotteryEffectOdds: make(map[int32][]EntityMCostumeLotteryEffectOddsGroup),
 	}
 
 	for _, row := range costumes {
@@ -259,7 +164,7 @@ func LoadCostumeCatalog(matCatalog *MaterialCatalog) (*CostumeCatalog, error) {
 	for _, row := range awakenEffectRows {
 		m, ok := catalog.AwakenEffectsByGroupAndStep[row.CostumeAwakenEffectGroupId]
 		if !ok {
-			m = make(map[int32]CostumeAwakenEffectRow)
+			m = make(map[int32]EntityMCostumeAwakenEffectGroup)
 			catalog.AwakenEffectsByGroupAndStep[row.CostumeAwakenEffectGroupId] = m
 		}
 		m[row.AwakenStep] = row

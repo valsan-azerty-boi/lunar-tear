@@ -10,19 +10,21 @@ import (
 
 func (s *SQLiteStore) LoadUser(userId int64) (store.UserState, error) {
 	var u store.UserState
+	var fbId sql.NullInt64
 
 	err := s.db.QueryRow(`SELECT user_id, uuid, player_id, os_type, platform_type, user_restriction_type,
 		register_datetime, game_start_datetime, latest_version, birth_year, birth_month,
-		backup_token, charge_money_this_month FROM users WHERE user_id = ?`, userId).Scan(
+		backup_token, charge_money_this_month, facebook_id FROM users WHERE user_id = ?`, userId).Scan(
 		&u.UserId, &u.Uuid, &u.PlayerId, &u.OsType, &u.PlatformType, &u.UserRestrictionType,
 		&u.RegisterDatetime, &u.GameStartDatetime, &u.LatestVersion, &u.BirthYear, &u.BirthMonth,
-		&u.BackupToken, &u.ChargeMoneyThisMonth)
+		&u.BackupToken, &u.ChargeMoneyThisMonth, &fbId)
 	if err == sql.ErrNoRows {
 		return u, store.ErrNotFound
 	}
 	if err != nil {
 		return u, fmt.Errorf("load users: %w", err)
 	}
+	u.FacebookId = fbId.Int64
 
 	initMaps(&u)
 
@@ -58,6 +60,7 @@ func initMaps(u *store.UserState) {
 	u.Parts = make(map[string]store.PartsState)
 	u.PartsGroupNotes = make(map[int32]store.PartsGroupNoteState)
 	u.PartsPresets = make(map[int32]store.PartsPresetState)
+	u.PartsStatusSubs = make(map[store.PartsStatusSubKey]store.PartsStatusSubState)
 	u.DeckTypeNotes = make(map[model.DeckType]store.DeckTypeNoteState)
 	u.ConsumableItems = make(map[int32]int32)
 	u.Materials = make(map[int32]int32)
@@ -449,6 +452,16 @@ func loadMapTables(db *sql.DB, uid int64, u *store.UserState) {
 			rows.Scan(&v.UserPartsPresetNumber, &v.UserPartsUuid01, &v.UserPartsUuid02, &v.UserPartsUuid03,
 				&v.Name, &v.UserPartsPresetTagNumber, &v.LatestVersion)
 			u.PartsPresets[v.UserPartsPresetNumber] = v
+		})
+
+	queryRows(db, `SELECT user_parts_uuid, status_index, parts_status_sub_lottery_id, level,
+		status_kind_type, status_calculation_type, status_change_value, latest_version
+		FROM user_parts_status_subs WHERE user_id=?`, uid,
+		func(rows *sql.Rows) {
+			var v store.PartsStatusSubState
+			rows.Scan(&v.UserPartsUuid, &v.StatusIndex, &v.PartsStatusSubLotteryId, &v.Level,
+				&v.StatusKindType, &v.StatusCalculationType, &v.StatusChangeValue, &v.LatestVersion)
+			u.PartsStatusSubs[store.PartsStatusSubKey{UserPartsUuid: v.UserPartsUuid, StatusIndex: v.StatusIndex}] = v
 		})
 
 	queryRows(db, `SELECT deck_type, max_deck_power, latest_version FROM user_deck_type_notes WHERE user_id=?`, uid,

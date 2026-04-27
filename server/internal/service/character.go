@@ -8,7 +8,6 @@ import (
 	"lunar-tear/server/internal/gametime"
 	"lunar-tear/server/internal/masterdata"
 	"lunar-tear/server/internal/store"
-	"lunar-tear/server/internal/userdata"
 )
 
 type CharacterServiceServer struct {
@@ -26,7 +25,7 @@ func NewCharacterServiceServer(users store.UserRepository, sessions store.Sessio
 func (s *CharacterServiceServer) Rebirth(ctx context.Context, req *pb.RebirthRequest) (*pb.RebirthResponse, error) {
 	log.Printf("[CharacterService] Rebirth: characterId=%d rebirthCount=%d", req.CharacterId, req.RebirthCount)
 
-	userId := currentUserId(ctx, s.users, s.sessions)
+	userId := CurrentUserId(ctx, s.users, s.sessions)
 	nowMillis := gametime.NowMillis()
 
 	stepGroupId, ok := s.catalog.StepGroupByCharacterId[req.CharacterId]
@@ -35,11 +34,7 @@ func (s *CharacterServiceServer) Rebirth(ctx context.Context, req *pb.RebirthReq
 		return &pb.RebirthResponse{}, nil
 	}
 
-	oldUser, _ := s.users.LoadUser(userId)
-	tracker := userdata.NewDeleteTracker().
-		Track("IUserMaterial", oldUser, userdata.SortedMaterialRecords, []string{"userId", "materialId"})
-
-	snapshot, err := s.users.UpdateUser(userId, func(user *store.UserState) {
+	_, err := s.users.UpdateUser(userId, func(user *store.UserState) {
 		current := user.CharacterRebirths[req.CharacterId]
 		currentCount := current.RebirthCount
 		targetCount := currentCount + req.RebirthCount
@@ -77,9 +72,5 @@ func (s *CharacterServiceServer) Rebirth(ctx context.Context, req *pb.RebirthReq
 		return nil, err
 	}
 
-	rebirthTables := []string{"IUserCharacterRebirth", "IUserMaterial", "IUserConsumableItem"}
-	tables := userdata.ProjectTables(snapshot, rebirthTables)
-	diff := tracker.Apply(snapshot, tables)
-
-	return &pb.RebirthResponse{DiffUserData: diff}, nil
+	return &pb.RebirthResponse{}, nil
 }

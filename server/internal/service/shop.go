@@ -10,29 +10,9 @@ import (
 	"lunar-tear/server/internal/masterdata"
 	"lunar-tear/server/internal/model"
 	"lunar-tear/server/internal/store"
-	"lunar-tear/server/internal/userdata"
 
 	"google.golang.org/protobuf/types/known/emptypb"
 )
-
-var shopDiffTables = []string{
-	"IUserShopItem",
-	"IUserShopReplaceable",
-	"IUserShopReplaceableLineup",
-	"IUserGem",
-	"IUserConsumableItem",
-	"IUserMaterial",
-	"IUserImportantItem",
-	"IUserPremiumItem",
-	"IUserStatus",
-	"IUserCostume",
-	"IUserCostumeActiveSkill",
-	"IUserCharacter",
-	"IUserWeapon",
-	"IUserWeaponSkill",
-	"IUserWeaponAbility",
-	"IUserWeaponNote",
-}
 
 type ShopServiceServer struct {
 	pb.UnimplementedShopServiceServer
@@ -49,10 +29,10 @@ func NewShopServiceServer(users store.UserRepository, sessions store.SessionRepo
 func (s *ShopServiceServer) Buy(ctx context.Context, req *pb.BuyRequest) (*pb.BuyResponse, error) {
 	log.Printf("[ShopService] Buy: shopId=%d items=%v", req.ShopId, req.ShopItems)
 
-	userId := currentUserId(ctx, s.users, s.sessions)
+	userId := CurrentUserId(ctx, s.users, s.sessions)
 	nowMillis := gametime.NowMillis()
 
-	snapshot, err := s.users.UpdateUser(userId, func(user *store.UserState) {
+	_, err := s.users.UpdateUser(userId, func(user *store.UserState) {
 		for shopItemId, qty := range req.ShopItems {
 			item, ok := s.catalog.Items[shopItemId]
 			if !ok {
@@ -88,23 +68,18 @@ func (s *ShopServiceServer) Buy(ctx context.Context, req *pb.BuyRequest) (*pb.Bu
 	if err != nil {
 		return nil, fmt.Errorf("shop buy: %w", err)
 	}
-
-	diff := userdata.BuildDiffFromTables(userdata.ProjectTables(snapshot, shopDiffTables))
-	userdata.AddWeaponStoryDiff(diff, snapshot, s.granter.DrainChangedStoryWeaponIds())
-
 	return &pb.BuyResponse{
 		OverflowPossession: []*pb.Possession{},
-		DiffUserData:       diff,
 	}, nil
 }
 
 func (s *ShopServiceServer) RefreshUserData(ctx context.Context, req *pb.RefreshRequest) (*pb.RefreshResponse, error) {
 	log.Printf("[ShopService] RefreshUserData: isGemUsed=%v", req.IsGemUsed)
 
-	userId := currentUserId(ctx, s.users, s.sessions)
+	userId := CurrentUserId(ctx, s.users, s.sessions)
 	nowMillis := gametime.NowMillis()
 
-	snapshot, err := s.users.UpdateUser(userId, func(user *store.UserState) {
+	_, err := s.users.UpdateUser(userId, func(user *store.UserState) {
 		if len(user.ShopReplaceableLineup) == 0 && len(s.catalog.ItemShopPool) > 0 {
 			for i, itemId := range s.catalog.ItemShopPool {
 				slot := int32(i + 1)
@@ -131,18 +106,13 @@ func (s *ShopServiceServer) RefreshUserData(ctx context.Context, req *pb.Refresh
 		return nil, fmt.Errorf("shop refresh: %w", err)
 	}
 
-	diff := userdata.BuildDiffFromTables(userdata.ProjectTables(snapshot, shopDiffTables))
-
-	return &pb.RefreshResponse{
-		DiffUserData: diff,
-	}, nil
+	return &pb.RefreshResponse{}, nil
 }
 
 func (s *ShopServiceServer) GetCesaLimit(_ context.Context, _ *emptypb.Empty) (*pb.GetCesaLimitResponse, error) {
 	log.Printf("[ShopService] GetCesaLimit")
 	return &pb.GetCesaLimitResponse{
-		CesaLimit:    []*pb.CesaLimit{},
-		DiffUserData: userdata.EmptyDiff(),
+		CesaLimit: []*pb.CesaLimit{},
 	}, nil
 }
 
@@ -150,10 +120,10 @@ func (s *ShopServiceServer) CreatePurchaseTransaction(ctx context.Context, req *
 	log.Printf("[ShopService] CreatePurchaseTransaction: shopId=%d shopItemId=%d productId=%s",
 		req.ShopId, req.ShopItemId, req.ProductId)
 
-	userId := currentUserId(ctx, s.users, s.sessions)
+	userId := CurrentUserId(ctx, s.users, s.sessions)
 	nowMillis := gametime.NowMillis()
 
-	snapshot, err := s.users.UpdateUser(userId, func(user *store.UserState) {
+	_, err := s.users.UpdateUser(userId, func(user *store.UserState) {
 		item, ok := s.catalog.Items[req.ShopItemId]
 		if !ok {
 			log.Printf("[ShopService] CreatePurchaseTransaction: unknown shopItemId=%d", req.ShopItemId)
@@ -193,28 +163,22 @@ func (s *ShopServiceServer) CreatePurchaseTransaction(ctx context.Context, req *
 
 	txId := fmt.Sprintf("tx_%d_%d_%d", userId, req.ShopItemId, nowMillis)
 
-	diff := userdata.BuildDiffFromTables(userdata.ProjectTables(snapshot, shopDiffTables))
-
 	return &pb.CreatePurchaseTransactionResponse{
 		PurchaseTransactionId: txId,
-		DiffUserData:          diff,
 	}, nil
 }
 
 func (s *ShopServiceServer) PurchaseGooglePlayStoreProduct(ctx context.Context, req *pb.PurchaseGooglePlayStoreProductRequest) (*pb.PurchaseGooglePlayStoreProductResponse, error) {
 	log.Printf("[ShopService] PurchaseGooglePlayStoreProduct: txId=%s", req.PurchaseTransactionId)
 
-	userId := currentUserId(ctx, s.users, s.sessions)
-	snapshot, err := s.users.LoadUser(userId)
+	userId := CurrentUserId(ctx, s.users, s.sessions)
+	_, err := s.users.LoadUser(userId)
 	if err != nil {
 		return nil, fmt.Errorf("purchase google play: %w", err)
 	}
 
-	diff := userdata.BuildDiffFromTables(userdata.ProjectTables(snapshot, shopDiffTables))
-
 	return &pb.PurchaseGooglePlayStoreProductResponse{
 		OverflowPossession: []*pb.Possession{},
-		DiffUserData:       diff,
 	}, nil
 }
 

@@ -20,7 +20,9 @@ type assetResolution struct {
 	Candidates     []assetCandidate
 }
 
-type assetResolver struct{}
+type assetResolver struct {
+	baseDir string
+}
 
 func newRevisionTracker() *revisionTracker {
 	return &revisionTracker{
@@ -28,8 +30,8 @@ func newRevisionTracker() *revisionTracker {
 	}
 }
 
-func newAssetResolver() *assetResolver {
-	return &assetResolver{}
+func newAssetResolver(baseDir string) *assetResolver {
+	return &assetResolver{baseDir: baseDir}
 }
 
 func normalizeClientAddr(remoteAddr string) string {
@@ -73,7 +75,7 @@ func (r *assetResolver) Resolve(objectId, assetType, activeRevision string) (ass
 	resolution := assetResolution{ActiveRevision: activeRevision}
 	revision := activeRevision
 
-	candidates, listSize, ok := objectIdToFilePathCandidates(revision, assetType, objectId)
+	candidates, listSize, ok := objectIdToFilePathCandidates(r.baseDir, revision, assetType, objectId)
 	if ok && len(candidates) > 0 {
 		resolution.ListRevision = revision
 		resolution.ListSize = listSize
@@ -94,6 +96,6 @@ func (r *assetResolver) Prewarm(activeRevision string) {
 	if activeRevision == "" {
 		return
 	}
-	_, _ = loadListBinIndex(activeRevision)
-	_ = loadInfoIndex(activeRevision)
+	_, _ = loadListBinIndex(r.baseDir, activeRevision)
+	_ = loadInfoIndex(r.baseDir, activeRevision)
 }

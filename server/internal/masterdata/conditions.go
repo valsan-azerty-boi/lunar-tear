@@ -7,19 +7,6 @@ import (
 	"lunar-tear/server/internal/utils"
 )
 
-type evaluateCondition struct {
-	EvaluateConditionId           int32                               `json:"EvaluateConditionId"`
-	EvaluateConditionFunctionType model.EvaluateConditionFunctionType `json:"EvaluateConditionFunctionType"`
-	EvaluateConditionEvaluateType model.EvaluateConditionEvaluateType `json:"EvaluateConditionEvaluateType"`
-	EvaluateConditionValueGroupId int32                               `json:"EvaluateConditionValueGroupId"`
-}
-
-type evaluateConditionValueGroup struct {
-	EvaluateConditionValueGroupId int32 `json:"EvaluateConditionValueGroupId"`
-	GroupIndex                    int32 `json:"GroupIndex"`
-	Value                         int64 `json:"Value"`
-}
-
 const defaultGroupIndex = 1
 
 type ConditionResolver struct {
@@ -27,16 +14,16 @@ type ConditionResolver struct {
 }
 
 func LoadConditionResolver() (*ConditionResolver, error) {
-	conditions, err := utils.ReadJSON[evaluateCondition]("EntityMEvaluateConditionTable.json")
+	conditions, err := utils.ReadTable[EntityMEvaluateCondition]("m_evaluate_condition")
 	if err != nil {
 		return nil, fmt.Errorf("load evaluate condition table: %w", err)
 	}
-	valueGroups, err := utils.ReadJSON[evaluateConditionValueGroup]("EntityMEvaluateConditionValueGroupTable.json")
+	valueGroups, err := utils.ReadTable[EntityMEvaluateConditionValueGroup]("m_evaluate_condition_value_group")
 	if err != nil {
 		return nil, fmt.Errorf("load evaluate condition value group table: %w", err)
 	}
 
-	condById := make(map[int32]evaluateCondition, len(conditions))
+	condById := make(map[int32]EntityMEvaluateCondition, len(conditions))
 	for _, c := range conditions {
 		condById[c.EvaluateConditionId] = c
 	}
@@ -52,8 +39,8 @@ func LoadConditionResolver() (*ConditionResolver, error) {
 
 	resolved := make(map[int32]int32)
 	for _, c := range conditions {
-		if c.EvaluateConditionFunctionType == model.EvaluateConditionFunctionTypeQuestClear &&
-			c.EvaluateConditionEvaluateType == model.EvaluateConditionEvaluateTypeIdContain {
+		if model.EvaluateConditionFunctionType(c.EvaluateConditionFunctionType) == model.EvaluateConditionFunctionTypeQuestClear &&
+			model.EvaluateConditionEvaluateType(c.EvaluateConditionEvaluateType) == model.EvaluateConditionEvaluateTypeIdContain {
 			if questId, ok := vgByKey[vgKey{c.EvaluateConditionValueGroupId, defaultGroupIndex}]; ok {
 				resolved[c.EvaluateConditionId] = int32(questId)
 			}

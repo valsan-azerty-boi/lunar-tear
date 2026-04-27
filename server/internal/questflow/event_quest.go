@@ -83,7 +83,7 @@ func (h *QuestHandler) HandleEventQuestSceneProgress(user *store.UserState, ques
 
 	h.applySceneGrants(user, questSceneId, nowMillis)
 
-	if scene.QuestResultType == model.QuestResultTypeHalfResult {
+	if model.QuestResultType(scene.QuestResultType) == model.QuestResultTypeHalfResult {
 		h.clearQuestMissions(user, scene.QuestId, nowMillis)
 	}
 }

@@ -2,73 +2,56 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
-	"sort"
+	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	pb "lunar-tear/server/gen/proto"
 	"lunar-tear/server/internal/gametime"
 	"lunar-tear/server/internal/model"
 	"lunar-tear/server/internal/store"
-	"lunar-tear/server/internal/userdata"
-
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
-	"google.golang.org/protobuf/types/known/emptypb"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type UserServiceServer struct {
 	pb.UnimplementedUserServiceServer
 	users    store.UserRepository
 	sessions store.SessionRepository
+	authURL  string
 }
 
-func NewUserServiceServer(users store.UserRepository, sessions store.SessionRepository) *UserServiceServer {
-	return &UserServiceServer{users: users, sessions: sessions}
-}
-
-func setCommonResponseTrailers(ctx context.Context, diff map[string]*pb.DiffData, includeUpdateNames bool) {
-	keys := make([]string, 0, len(diff))
-	for key := range diff {
-		keys = append(keys, key)
+func NewUserServiceServer(users store.UserRepository, sessions store.SessionRepository, authURL string) *UserServiceServer {
+	if authURL != "" && !strings.Contains(authURL, "://") {
+		authURL = "http://" + authURL
 	}
-	sort.Strings(keys)
-
-	var pairs []string
-	if includeUpdateNames && len(keys) > 0 {
-		pairs = append(pairs, "x-apb-update-user-data-names", keys[0])
-		for _, key := range keys[1:] {
-			pairs[len(pairs)-1] += "," + key
-		}
-	}
-
-	if err := grpc.SetTrailer(ctx, metadata.Pairs(pairs...)); err != nil {
-		log.Printf("[UserService] failed to set trailers: %v", err)
-	}
+	return &UserServiceServer{users: users, sessions: sessions, authURL: authURL}
 }
 
 func (s *UserServiceServer) RegisterUser(ctx context.Context, req *pb.RegisterUserRequest) (*pb.RegisterUserResponse, error) {
-	userId, err := s.users.CreateUser(req.Uuid)
+	platform := model.ClientPlatformFromContext(ctx)
+	userId, err := s.users.CreateUser(req.Uuid, platform)
 	if err != nil {
 		return nil, fmt.Errorf("create user: %w", err)
 	}
-	user, err := s.users.LoadUser(userId)
-	if err != nil {
-		return nil, fmt.Errorf("load user: %w", err)
-	}
-	log.Printf("[UserService] RegisterUser: uuid=%s terminalId=%s -> userId=%d", req.Uuid, req.TerminalId, user.UserId)
+	log.Printf("[UserService] RegisterUser: uuid=%s terminalId=%s platform=%s -> userId=%d", req.Uuid, req.TerminalId, platform, userId)
 
 	return &pb.RegisterUserResponse{
-		UserId:       user.UserId,
-		Signature:    fmt.Sprintf("sig_%d_%d", user.UserId, gametime.Now().Unix()),
-		DiffUserData: userdata.BuildDiffFromTables(userdata.FirstEntranceClientTableMap(user)),
+		UserId:    userId,
+		Signature: fmt.Sprintf("sig_%d_%d", userId, gametime.Now().Unix()),
 	}, nil
 }
 
 func (s *UserServiceServer) Auth(ctx context.Context, req *pb.AuthUserRequest) (*pb.AuthUserResponse, error) {
-	log.Printf("[UserService] Auth: uuid=%s", req.Uuid)
+	platform := model.ClientPlatformFromContext(ctx)
+	log.Printf("[UserService] Auth: uuid=%s platform=%s", req.Uuid, platform)
 
 	session, err := s.sessions.CreateSession(req.Uuid, 24*time.Hour)
 	if err != nil {
@@ -84,7 +67,6 @@ func (s *UserServiceServer) Auth(ctx context.Context, req *pb.AuthUserRequest) (
 		ExpireDatetime: timestamppb.New(session.ExpireAt),
 		Signature:      req.Signature,
 		UserId:         user.UserId,
-		DiffUserData:   userdata.BuildDiffFromTables(userdata.FirstEntranceClientTableMap(user)),
 	}, nil
 }
 
@@ -97,81 +79,69 @@ func (s *UserServiceServer) GameStart(ctx context.Context, _ *emptypb.Empty) (*p
 		}
 	}
 
-	userId := currentUserId(ctx, s.users, s.sessions)
-	user, _ := s.users.UpdateUser(userId, func(user *store.UserState) {
+	userId := CurrentUserId(ctx, s.users, s.sessions)
+	s.users.UpdateUser(userId, func(user *store.UserState) {
 		user.GameStartDatetime = gametime.NowMillis()
 	})
-	diff := userdata.BuildDiffFromTables(userdata.ProjectTables(user, startedGameStartTables))
-	setCommonResponseTrailers(ctx, diff, true)
 
-	return &pb.GameStartResponse{
-		// Apply only the starter outgame rows we need after title completion.
-		// Keep IUser and other risky core-account rows out of GameStart diff.
-		DiffUserData: diff,
-	}, nil
+	return &pb.GameStartResponse{}, nil
 }
 
 func (s *UserServiceServer) TransferUser(ctx context.Context, req *pb.TransferUserRequest) (*pb.TransferUserResponse, error) {
-	log.Printf("[UserService] TransferUser")
-	userId, err := s.users.CreateUser(req.Uuid)
+	platform := model.ClientPlatformFromContext(ctx)
+	log.Printf("[UserService] TransferUser: platform=%s", platform)
+	userId, err := s.users.CreateUser(req.Uuid, platform)
 	if err != nil {
 		return nil, fmt.Errorf("create user: %w", err)
 	}
 	return &pb.TransferUserResponse{
-		UserId:       userId,
-		Signature:    "transferred-sig",
-		DiffUserData: userdata.EmptyDiff(),
+		UserId:    userId,
+		Signature: "transferred-sig",
 	}, nil
 }
 
 func (s *UserServiceServer) SetUserName(ctx context.Context, req *pb.SetUserNameRequest) (*pb.SetUserNameResponse, error) {
 	log.Printf("[UserService] SetUserName: %s", req.Name)
-	userId := currentUserId(ctx, s.users, s.sessions)
-	user, _ := s.users.UpdateUser(userId, func(user *store.UserState) {
+	userId := CurrentUserId(ctx, s.users, s.sessions)
+	s.users.UpdateUser(userId, func(user *store.UserState) {
 		nowMillis := gametime.NowMillis()
 		user.Profile.Name = req.Name
 		user.Profile.NameUpdateDatetime = nowMillis
 	})
-	return &pb.SetUserNameResponse{
-		DiffUserData: userdata.BuildDiffFromTables(userdata.ProjectTables(user, []string{"IUserProfile"})),
-	}, nil
+	return &pb.SetUserNameResponse{}, nil
 }
 
 func (s *UserServiceServer) SetUserMessage(ctx context.Context, req *pb.SetUserMessageRequest) (*pb.SetUserMessageResponse, error) {
 	log.Printf("[UserService] SetUserMessage: %s", req.Message)
-	userId := currentUserId(ctx, s.users, s.sessions)
-	user, _ := s.users.UpdateUser(userId, func(user *store.UserState) {
+	userId := CurrentUserId(ctx, s.users, s.sessions)
+	s.users.UpdateUser(userId, func(user *store.UserState) {
 		nowMillis := gametime.NowMillis()
 		user.Profile.Message = req.Message
 		user.Profile.MessageUpdateDatetime = nowMillis
 	})
-	return &pb.SetUserMessageResponse{
-		DiffUserData: userdata.BuildDiffFromTables(userdata.ProjectTables(user, []string{"IUserProfile"})),
-	}, nil
+	return &pb.SetUserMessageResponse{}, nil
 }
 
 func (s *UserServiceServer) SetUserFavoriteCostumeId(ctx context.Context, req *pb.SetUserFavoriteCostumeIdRequest) (*pb.SetUserFavoriteCostumeIdResponse, error) {
 	log.Printf("[UserService] SetUserFavoriteCostumeId: %d", req.FavoriteCostumeId)
-	userId := currentUserId(ctx, s.users, s.sessions)
-	user, _ := s.users.UpdateUser(userId, func(user *store.UserState) {
+	userId := CurrentUserId(ctx, s.users, s.sessions)
+	s.users.UpdateUser(userId, func(user *store.UserState) {
 		nowMillis := gametime.NowMillis()
 		user.Profile.FavoriteCostumeId = req.FavoriteCostumeId
 		user.Profile.FavoriteCostumeIdUpdateDatetime = nowMillis
 	})
-	return &pb.SetUserFavoriteCostumeIdResponse{
-		DiffUserData: userdata.BuildDiffFromTables(userdata.ProjectTables(user, []string{"IUserProfile"})),
-	}, nil
+	return &pb.SetUserFavoriteCostumeIdResponse{}, nil
 }
 
 func (s *UserServiceServer) GetUserProfile(ctx context.Context, req *pb.GetUserProfileRequest) (*pb.GetUserProfileResponse, error) {
 	log.Printf("[UserService] GetUserProfile: playerId=%d", req.PlayerId)
 	userId := req.PlayerId
 	if userId == 0 {
-		userId = currentUserId(ctx, s.users, s.sessions)
+		userId = CurrentUserId(ctx, s.users, s.sessions)
 	}
 	user, err := s.users.LoadUser(userId)
 	if err != nil {
-		return &pb.GetUserProfileResponse{DiffUserData: userdata.EmptyDiff()}, nil
+		return &pb.GetUserProfileResponse{}, nil
 	}
 
 	deckCharacters := []*pb.ProfileDeckCharacter{}
@@ -210,66 +180,148 @@ func (s *UserServiceServer) GetUserProfile(ctx context.Context, req *pb.GetUserP
 			HistoryItem:              []*pb.PlayHistoryItem{},
 			HistoryCategoryGraphItem: []*pb.PlayHistoryCategoryGraphItem{},
 		},
-		DiffUserData: userdata.EmptyDiff(),
 	}, nil
 }
 
 func (s *UserServiceServer) SetBirthYearMonth(ctx context.Context, req *pb.SetBirthYearMonthRequest) (*pb.SetBirthYearMonthResponse, error) {
 	log.Printf("[UserService] SetBirthYearMonth: %d/%d", req.BirthYear, req.BirthMonth)
-	userId := currentUserId(ctx, s.users, s.sessions)
+	userId := CurrentUserId(ctx, s.users, s.sessions)
 	_, _ = s.users.UpdateUser(userId, func(user *store.UserState) {
 		user.BirthYear = req.BirthYear
 		user.BirthMonth = req.BirthMonth
 	})
-	return &pb.SetBirthYearMonthResponse{DiffUserData: userdata.EmptyDiff()}, nil
+	return &pb.SetBirthYearMonthResponse{}, nil
 }
 
 func (s *UserServiceServer) GetBirthYearMonth(ctx context.Context, _ *emptypb.Empty) (*pb.GetBirthYearMonthResponse, error) {
-	userId := currentUserId(ctx, s.users, s.sessions)
+	userId := CurrentUserId(ctx, s.users, s.sessions)
 	user, err := s.users.LoadUser(userId)
 	if err != nil {
-		return &pb.GetBirthYearMonthResponse{BirthYear: 2000, BirthMonth: 1, DiffUserData: userdata.EmptyDiff()}, nil
+		return &pb.GetBirthYearMonthResponse{BirthYear: 2000, BirthMonth: 1}, nil
 	}
-	return &pb.GetBirthYearMonthResponse{BirthYear: user.BirthYear, BirthMonth: user.BirthMonth, DiffUserData: userdata.EmptyDiff()}, nil
+	return &pb.GetBirthYearMonthResponse{BirthYear: user.BirthYear, BirthMonth: user.BirthMonth}, nil
 }
 
 func (s *UserServiceServer) GetChargeMoney(ctx context.Context, _ *emptypb.Empty) (*pb.GetChargeMoneyResponse, error) {
-	userId := currentUserId(ctx, s.users, s.sessions)
+	userId := CurrentUserId(ctx, s.users, s.sessions)
 	user, err := s.users.LoadUser(userId)
 	if err != nil {
-		return &pb.GetChargeMoneyResponse{ChargeMoneyThisMonth: 0, DiffUserData: userdata.EmptyDiff()}, nil
+		return &pb.GetChargeMoneyResponse{ChargeMoneyThisMonth: 0}, nil
 	}
-	return &pb.GetChargeMoneyResponse{ChargeMoneyThisMonth: user.ChargeMoneyThisMonth, DiffUserData: userdata.EmptyDiff()}, nil
+	return &pb.GetChargeMoneyResponse{ChargeMoneyThisMonth: user.ChargeMoneyThisMonth}, nil
 }
 
 func (s *UserServiceServer) SetUserSetting(ctx context.Context, req *pb.SetUserSettingRequest) (*pb.SetUserSettingResponse, error) {
 	log.Printf("[UserService] SetUserSetting: isNotifyPurchaseAlert=%v", req.IsNotifyPurchaseAlert)
-	userId := currentUserId(ctx, s.users, s.sessions)
-	user, _ := s.users.UpdateUser(userId, func(user *store.UserState) {
+	userId := CurrentUserId(ctx, s.users, s.sessions)
+	s.users.UpdateUser(userId, func(user *store.UserState) {
 		user.Setting.IsNotifyPurchaseAlert = req.IsNotifyPurchaseAlert
 	})
-	return &pb.SetUserSettingResponse{
-		DiffUserData: userdata.BuildDiffFromTables(userdata.ProjectTables(user, []string{"IUserSetting"})),
-	}, nil
+	return &pb.SetUserSettingResponse{}, nil
 }
 
 func (s *UserServiceServer) GetAndroidArgs(ctx context.Context, req *pb.GetAndroidArgsRequest) (*pb.GetAndroidArgsResponse, error) {
-	return &pb.GetAndroidArgsResponse{Nonce: "Mama", ApiKey: "1234567890", DiffUserData: userdata.EmptyDiff()}, nil
+	return &pb.GetAndroidArgsResponse{Nonce: "Mama", ApiKey: "1234567890"}, nil
 }
 
 func (s *UserServiceServer) GetBackupToken(ctx context.Context, req *pb.GetBackupTokenRequest) (*pb.GetBackupTokenResponse, error) {
-	userId := currentUserId(ctx, s.users, s.sessions)
+	userId := CurrentUserId(ctx, s.users, s.sessions)
 	user, err := s.users.LoadUser(userId)
 	if err != nil {
-		return &pb.GetBackupTokenResponse{BackupToken: "mock-backup-token", DiffUserData: userdata.EmptyDiff()}, nil
+		return &pb.GetBackupTokenResponse{BackupToken: "mock-backup-token"}, nil
 	}
-	return &pb.GetBackupTokenResponse{BackupToken: user.BackupToken, DiffUserData: userdata.EmptyDiff()}, nil
+	return &pb.GetBackupTokenResponse{BackupToken: user.BackupToken}, nil
 }
 
 func (s *UserServiceServer) CheckTransferSetting(ctx context.Context, _ *emptypb.Empty) (*pb.CheckTransferSettingResponse, error) {
-	return &pb.CheckTransferSettingResponse{DiffUserData: userdata.EmptyDiff()}, nil
+	return &pb.CheckTransferSettingResponse{}, nil
 }
 
 func (s *UserServiceServer) GetUserGamePlayNote(ctx context.Context, req *pb.GetUserGamePlayNoteRequest) (*pb.GetUserGamePlayNoteResponse, error) {
-	return &pb.GetUserGamePlayNoteResponse{DiffUserData: userdata.EmptyDiff()}, nil
+	return &pb.GetUserGamePlayNoteResponse{}, nil
+}
+
+func (s *UserServiceServer) resolveAuthToken(token string) (facebookId int64, err error) {
+	if s.authURL == "" {
+		return 0, status.Error(codes.FailedPrecondition, "auth server not configured (--auth-url)")
+	}
+
+	resp, err := http.Get(s.authURL + "/me?access_token=" + token)
+	if err != nil {
+		return 0, status.Errorf(codes.Internal, "auth server unreachable: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return 0, status.Error(codes.Unauthenticated, "invalid or expired token")
+	}
+
+	var body struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		return 0, status.Errorf(codes.Internal, "decode auth response: %v", err)
+	}
+	if body.ID == "" {
+		return 0, status.Error(codes.Unauthenticated, "auth server returned empty id")
+	}
+
+	id, err := strconv.ParseInt(body.ID, 10, 64)
+	if err != nil {
+		return 0, status.Errorf(codes.Internal, "invalid auth id %q: %v", body.ID, err)
+	}
+	return id, nil
+}
+
+func (s *UserServiceServer) SetFacebookAccount(ctx context.Context, req *pb.SetFacebookAccountRequest) (*pb.SetFacebookAccountResponse, error) {
+	log.Printf("[UserService] SetFacebookAccount")
+
+	fbId, err := s.resolveAuthToken(req.Token)
+	if err != nil {
+		return nil, err
+	}
+
+	userId := CurrentUserId(ctx, s.users, s.sessions)
+	if err := s.users.SetFacebookId(userId, fbId); err != nil {
+		return nil, fmt.Errorf("set facebook id: %w", err)
+	}
+	log.Printf("[UserService] linked facebook_id=%d to user_id=%d", fbId, userId)
+	return &pb.SetFacebookAccountResponse{}, nil
+}
+
+func (s *UserServiceServer) UnsetFacebookAccount(ctx context.Context, _ *emptypb.Empty) (*pb.UnsetFacebookAccountResponse, error) {
+	log.Printf("[UserService] UnsetFacebookAccount")
+
+	userId := CurrentUserId(ctx, s.users, s.sessions)
+	if err := s.users.ClearFacebookId(userId); err != nil {
+		return nil, fmt.Errorf("clear facebook id: %w", err)
+	}
+	log.Printf("[UserService] unlinked facebook from user_id=%d", userId)
+	return &pb.UnsetFacebookAccountResponse{}, nil
+}
+
+func (s *UserServiceServer) TransferUserByFacebook(ctx context.Context, req *pb.TransferUserByFacebookRequest) (*pb.TransferUserByFacebookResponse, error) {
+	log.Printf("[UserService] TransferUserByFacebook: uuid=%s", req.Uuid)
+
+	fbId, err := s.resolveAuthToken(req.Token)
+	if err != nil {
+		return nil, err
+	}
+
+	userId, err := s.users.GetUserByFacebookId(fbId)
+	if err != nil {
+		return nil, status.Error(codes.NotFound, "no account linked to this login")
+	}
+
+	if err := s.users.UpdateUUID(userId, req.Uuid); err != nil {
+		return nil, fmt.Errorf("update uuid: %w", err)
+	}
+
+	log.Printf("[UserService] transferred facebook_id=%d -> user_id=%d with new uuid=%s", fbId, userId, req.Uuid)
+
+	return &pb.TransferUserByFacebookResponse{
+		UserId:    userId,
+		Signature: fmt.Sprintf("fb_transfer_%d_%d", userId, gametime.Now().Unix()),
+	}, nil
 }

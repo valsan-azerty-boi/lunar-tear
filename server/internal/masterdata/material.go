@@ -7,29 +7,15 @@ import (
 	"lunar-tear/server/internal/utils"
 )
 
-type MaterialRow struct {
-	MaterialId   int32              `json:"MaterialId"`
-	MaterialType model.MaterialType `json:"MaterialType"`
-	WeaponType   int32              `json:"WeaponType"`
-	EffectValue  int32              `json:"EffectValue"`
-	SellPrice    int32              `json:"SellPrice"`
-}
-
-type numericalParameterMapRow struct {
-	NumericalParameterMapId int32 `json:"NumericalParameterMapId"`
-	ParameterKey            int32 `json:"ParameterKey"`
-	ParameterValue          int32 `json:"ParameterValue"`
-}
-
-func LoadParameterMap() ([]numericalParameterMapRow, error) {
-	rows, err := utils.ReadJSON[numericalParameterMapRow]("EntityMNumericalParameterMapTable.json")
+func LoadParameterMap() ([]EntityMNumericalParameterMap, error) {
+	rows, err := utils.ReadTable[EntityMNumericalParameterMap]("m_numerical_parameter_map")
 	if err != nil {
 		return nil, fmt.Errorf("load numerical parameter map table: %w", err)
 	}
 	return rows, nil
 }
 
-func BuildExpThresholds(paramMapRows []numericalParameterMapRow, mapId int32) []int32 {
+func BuildExpThresholds(paramMapRows []EntityMNumericalParameterMap, mapId int32) []int32 {
 	maxKey := int32(0)
 	for _, r := range paramMapRows {
 		if r.NumericalParameterMapId == mapId && r.ParameterKey > maxKey {
@@ -46,26 +32,27 @@ func BuildExpThresholds(paramMapRows []numericalParameterMapRow, mapId int32) []
 }
 
 type MaterialCatalog struct {
-	All    map[int32]MaterialRow
-	ByType map[model.MaterialType]map[int32]MaterialRow
+	All    map[int32]EntityMMaterial
+	ByType map[model.MaterialType]map[int32]EntityMMaterial
 }
 
 func LoadMaterialCatalog() (*MaterialCatalog, error) {
-	rows, err := utils.ReadJSON[MaterialRow]("EntityMMaterialTable.json")
+	rows, err := utils.ReadTable[EntityMMaterial]("m_material")
 	if err != nil {
 		return nil, fmt.Errorf("load material table: %w", err)
 	}
 
 	catalog := &MaterialCatalog{
-		All:    make(map[int32]MaterialRow, len(rows)),
-		ByType: make(map[model.MaterialType]map[int32]MaterialRow),
+		All:    make(map[int32]EntityMMaterial, len(rows)),
+		ByType: make(map[model.MaterialType]map[int32]EntityMMaterial),
 	}
 	for _, row := range rows {
 		catalog.All[row.MaterialId] = row
-		if catalog.ByType[row.MaterialType] == nil {
-			catalog.ByType[row.MaterialType] = make(map[int32]MaterialRow)
+		mt := model.MaterialType(row.MaterialType)
+		if catalog.ByType[mt] == nil {
+			catalog.ByType[mt] = make(map[int32]EntityMMaterial)
 		}
-		catalog.ByType[row.MaterialType][row.MaterialId] = row
+		catalog.ByType[mt][row.MaterialId] = row
 	}
 	return catalog, nil
 }

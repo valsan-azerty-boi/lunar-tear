@@ -15,7 +15,7 @@ func (h *QuestHandler) applySceneGrants(user *store.UserState, questSceneId int3
 		return
 	}
 	for _, g := range grants {
-		h.applyRewardPossession(user, g.PossessionType, g.PossessionId, g.Count, nowMillis)
+		h.applyRewardPossession(user, model.PossessionType(g.PossessionType), g.PossessionId, g.Count, nowMillis)
 	}
 }
 
@@ -24,6 +24,23 @@ func (h *QuestHandler) isSceneAhead(newSceneId, currentHeadId int32) bool {
 		return true
 	}
 	return h.SceneById[newSceneId].SortOrder > h.SceneById[currentHeadId].SortOrder
+}
+
+func (h *QuestHandler) advanceMainFlowScene(user *store.UserState, questId, sceneId int32) {
+	user.MainQuest.CurrentQuestSceneId = sceneId
+	if h.isSceneAhead(sceneId, user.MainQuest.HeadQuestSceneId) {
+		user.MainQuest.HeadQuestSceneId = sceneId
+	}
+
+	lastSceneId := h.getChapterLastSceneId(questId)
+	user.MainQuest.IsReachedLastQuestScene = sceneId == lastSceneId
+
+	if routeId, ok := h.RouteIdByQuestId[questId]; ok {
+		user.MainQuest.CurrentMainQuestRouteId = routeId
+		if seasonId, ok := h.SeasonIdByRouteId[routeId]; ok {
+			user.MainQuest.MainQuestSeasonId = seasonId
+		}
+	}
 }
 
 func (h *QuestHandler) HandleMainFlowSceneProgress(user *store.UserState, questSceneId int32, nowMillis int64) {
@@ -37,10 +54,7 @@ func (h *QuestHandler) HandleMainFlowSceneProgress(user *store.UserState, questS
 		panic(fmt.Sprintf("unknown questId=%d for HandleMainFlowSceneProgress", questSceneId))
 	}
 
-	user.MainQuest.CurrentQuestSceneId = questSceneId
-	if h.isSceneAhead(questSceneId, user.MainQuest.HeadQuestSceneId) {
-		user.MainQuest.HeadQuestSceneId = questSceneId
-	}
+	h.advanceMainFlowScene(user, quest.QuestId, questSceneId)
 	user.MainQuest.CurrentQuestFlowType = int32(model.QuestFlowTypeMainFlow)
 
 	if user.SideStoryActiveProgress.CurrentSideStoryQuestId != 0 {
@@ -48,15 +62,6 @@ func (h *QuestHandler) HandleMainFlowSceneProgress(user *store.UserState, questS
 			LatestVersion: nowMillis,
 		}
 	}
-
-	lastSceneId := h.getChapterLastSceneId(scene.QuestId)
-	user.MainQuest.IsReachedLastQuestScene = questSceneId == lastSceneId
-
-	routeId, ok := h.RouteIdByQuestId[quest.QuestId]
-	if !ok {
-		panic(fmt.Sprintf("unknown questId=%d for HandleMainFlowSceneProgress setting currentMainQuestRouteId", quest.QuestId))
-	}
-	user.MainQuest.CurrentMainQuestRouteId = routeId
 
 	user.PortalCageStatus.IsCurrentProgress = false
 	user.PortalCageStatus.LatestVersion = nowMillis
@@ -123,7 +128,7 @@ func (h *QuestHandler) HandleMainQuestSceneProgress(user *store.UserState, quest
 	}
 
 	if isMainQuestPlayable(quest) {
-		if scene.QuestResultType == model.QuestResultTypeHalfResult {
+		if model.QuestResultType(scene.QuestResultType) == model.QuestResultTypeHalfResult {
 			nowMillis := gametime.NowMillis()
 			h.clearQuestMissions(user, quest.QuestId, nowMillis)
 		}

@@ -6,23 +6,18 @@ import (
 	"lunar-tear/server/internal/utils"
 )
 
-type ConsumableItemRow struct {
-	ConsumableItemId int32 `json:"ConsumableItemId"`
-	SellPrice        int32 `json:"SellPrice"`
-}
-
 type ConsumableItemCatalog struct {
-	All map[int32]ConsumableItemRow
+	All map[int32]EntityMConsumableItem
 }
 
 func LoadConsumableItemCatalog() (*ConsumableItemCatalog, error) {
-	rows, err := utils.ReadJSON[ConsumableItemRow]("EntityMConsumableItemTable.json")
+	rows, err := utils.ReadTable[EntityMConsumableItem]("m_consumable_item")
 	if err != nil {
 		return nil, fmt.Errorf("load consumable item table: %w", err)
 	}
 
 	catalog := &ConsumableItemCatalog{
-		All: make(map[int32]ConsumableItemRow, len(rows)),
+		All: make(map[int32]EntityMConsumableItem, len(rows)),
 	}
 	for _, row := range rows {
 		catalog.All[row.ConsumableItemId] = row

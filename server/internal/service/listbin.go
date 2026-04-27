@@ -208,7 +208,7 @@ func parseListBin(data []byte) listBinIndex {
 	return idx
 }
 
-func loadListBinIndex(revision string) (listBinIndex, bool) {
+func loadListBinIndex(baseDir, revision string) (listBinIndex, bool) {
 	listBinCacheMu.RLock()
 	idx, ok := listBinCache[revision]
 	listBinCacheMu.RUnlock()
@@ -230,7 +230,7 @@ func loadListBinIndex(revision string) (listBinIndex, bool) {
 	listBinInflight[revision] = load
 	listBinCacheMu.Unlock()
 
-	filePath := filepath.Join("assets", "revisions", revision, "list.bin")
+	filePath := filepath.Join(baseDir, "assets", "revisions", revision, "list.bin")
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		listBinCacheMu.Lock()
@@ -250,7 +250,7 @@ func loadListBinIndex(revision string) (listBinIndex, bool) {
 	return idx, true
 }
 
-func loadInfoIndex(revision string) map[string]infoAlias {
+func loadInfoIndex(baseDir, revision string) map[string]infoAlias {
 	infoCacheMu.RLock()
 	m, ok := infoCache[revision]
 	infoCacheMu.RUnlock()
@@ -272,7 +272,7 @@ func loadInfoIndex(revision string) map[string]infoAlias {
 	infoInflight[revision] = load
 	infoCacheMu.Unlock()
 
-	filePath := filepath.Join("assets", "revisions", revision, "info.json")
+	filePath := filepath.Join(baseDir, "assets", "revisions", revision, "info.json")
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		infoCacheMu.Lock()
@@ -378,7 +378,7 @@ func hasNonASCII(s string) bool {
 // an en locale fallback is appended (marked IsLocaleFallback so callers can skip MD5 validation).
 // For paths with non-ASCII characters, mojibake (double-encoded) and fullwidth-to-ASCII
 // variants are also tried.
-func pathStrToFullPaths(revision, assetType, pathStr string) []pathCandidate {
+func pathStrToFullPaths(baseDir, revision, assetType, pathStr string) []pathCandidate {
 	fsPath := strings.ReplaceAll(pathStr, ")", "/")
 	if strings.Contains(fsPath, "..") || filepath.IsAbs(fsPath) || strings.HasPrefix(fsPath, "/") {
 		return nil
@@ -402,7 +402,7 @@ func pathStrToFullPaths(revision, assetType, pathStr string) []pathCandidate {
 	if strings.Contains(pathStr, ")ko)") {
 		entries = append(entries, tagged{strings.ReplaceAll(pathStr, ")ko)", ")en)"), true})
 	}
-	base := filepath.Join("assets", "revisions", revision)
+	base := filepath.Join(baseDir, "assets", "revisions", revision)
 	var out []pathCandidate
 	seen := make(map[string]bool)
 	for _, e := range entries {
@@ -434,13 +434,13 @@ func appendUniqueCandidate(candidates []assetCandidate, seen map[string]bool, ca
 	return append(candidates, candidate)
 }
 
-func duplicateCandidatePath(candidate assetCandidate, assetType, targetRevision, targetBaseName string) string {
-	root := filepath.Join("assets", "revisions", candidate.Revision, assetType)
+func duplicateCandidatePath(baseDir string, candidate assetCandidate, assetType, targetRevision, targetBaseName string) string {
+	root := filepath.Join(baseDir, "assets", "revisions", candidate.Revision, assetType)
 	rel, err := filepath.Rel(root, candidate.Path)
 	if err != nil || strings.HasPrefix(rel, "..") || filepath.IsAbs(rel) {
 		return ""
 	}
-	return filepath.Join("assets", "revisions", targetRevision, assetType, filepath.Dir(rel), targetBaseName)
+	return filepath.Join(baseDir, "assets", "revisions", targetRevision, assetType, filepath.Dir(rel), targetBaseName)
 }
 
 // objectIdToFilePathCandidates returns candidate file paths for the object: list.bin path, locale fallbacks
@@ -448,8 +448,8 @@ func duplicateCandidatePath(candidate assetCandidate, assetType, targetRevision,
 // The original locale path is tried first (with MD5 validation); locale fallbacks are tried after
 // (without MD5 validation, since the hash in list.bin refers to the original locale's content).
 // Callers should try each path until one exists on disk.
-func objectIdToFilePathCandidates(revision, assetType, objectId string) (candidates []assetCandidate, size int64, ok bool) {
-	idx, ok := loadListBinIndex(revision)
+func objectIdToFilePathCandidates(baseDir, revision, assetType, objectId string) (candidates []assetCandidate, size int64, ok bool) {
+	idx, ok := loadListBinIndex(baseDir, revision)
 	if !ok || idx == nil {
 		return nil, 0, false
 	}
@@ -457,7 +457,7 @@ func objectIdToFilePathCandidates(revision, assetType, objectId string) (candida
 	if !ok || entry.Path == "" {
 		return nil, 0, false
 	}
-	paths := pathStrToFullPaths(revision, assetType, entry.Path)
+	paths := pathStrToFullPaths(baseDir, revision, assetType, entry.Path)
 	if len(paths) == 0 {
 		return nil, 0, false
 	}
@@ -474,15 +474,14 @@ func objectIdToFilePathCandidates(revision, assetType, objectId string) (candida
 			ExpectedMD5: md5,
 		})
 	}
-	// Add paths from info.json: when requested file is a "from-name" (duplicate not included), serve "to-name" instead.
-	infoIndex := loadInfoIndex(revision)
+	infoIndex := loadInfoIndex(baseDir, revision)
 	if len(infoIndex) > 0 {
 		for _, c := range candidates {
 			alias, ok := infoIndex[filepath.Base(c.Path)]
 			if !ok || alias.ToName == "" {
 				continue
 			}
-			alt := duplicateCandidatePath(c, assetType, alias.ToRevision, alias.ToName)
+			alt := duplicateCandidatePath(baseDir, c, assetType, alias.ToRevision, alias.ToName)
 			if alt == "" {
 				continue
 			}

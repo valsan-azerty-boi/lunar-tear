@@ -8,7 +8,6 @@ import (
 	pb "lunar-tear/server/gen/proto"
 	"lunar-tear/server/internal/gametime"
 	"lunar-tear/server/internal/store"
-	"lunar-tear/server/internal/userdata"
 )
 
 type MovieServiceServer struct {
@@ -24,10 +23,10 @@ func NewMovieServiceServer(users store.UserRepository, sessions store.SessionRep
 func (s *MovieServiceServer) SaveViewedMovie(ctx context.Context, req *pb.SaveViewedMovieRequest) (*pb.SaveViewedMovieResponse, error) {
 	log.Printf("[MovieService] SaveViewedMovie: movieIds=%v", req.MovieId)
 
-	userId := currentUserId(ctx, s.users, s.sessions)
+	userId := CurrentUserId(ctx, s.users, s.sessions)
 	now := gametime.NowMillis()
 
-	snapshot, err := s.users.UpdateUser(userId, func(user *store.UserState) {
+	_, err := s.users.UpdateUser(userId, func(user *store.UserState) {
 		for _, mid := range req.MovieId {
 			user.ViewedMovies[mid] = now
 		}
@@ -36,9 +35,5 @@ func (s *MovieServiceServer) SaveViewedMovie(ctx context.Context, req *pb.SaveVi
 		return nil, fmt.Errorf("update user: %w", err)
 	}
 
-	diff := userdata.BuildDiffFromTables(userdata.ProjectTables(snapshot, []string{"IUserMovie"}))
-
-	return &pb.SaveViewedMovieResponse{
-		DiffUserData: diff,
-	}, nil
+	return &pb.SaveViewedMovieResponse{}, nil
 }
