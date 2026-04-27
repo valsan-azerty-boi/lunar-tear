@@ -124,9 +124,15 @@ var requiredAssets = []assetCheck{
 	{"assets/release/20240404193219.bin.e", false},
 }
 
-// platformAssets holds the per-platform rev-0 layout. At least one full set
-// must be present; users may have only Android or only iOS extracted.
-var platformAssets = [][]assetCheck{
+// assetTrees lists every rev-0 layout the CDN accepts. At least one full set
+// must be present; users may have only the un-split shared tree, only Android,
+// only iOS, or any combination.
+var assetTrees = [][]assetCheck{
+	{
+		{"assets/revisions/0/list.bin", false},
+		{"assets/revisions/0/assetbundle", true},
+		{"assets/revisions/0/resources", true},
+	},
 	{
 		{"assets/revisions/0/android/list.bin", false},
 		{"assets/revisions/0/android/assetbundle", true},
@@ -161,9 +167,9 @@ func validateAssets() {
 		}
 	}
 
-	var platformMissing [][]string
-	anyPlatformOK := false
-	for _, group := range platformAssets {
+	var treeMissing [][]string
+	anyTreeOK := false
+	for _, group := range assetTrees {
 		var groupMissing []string
 		for _, a := range group {
 			if m, ok := checkAsset(a); !ok {
@@ -171,12 +177,12 @@ func validateAssets() {
 			}
 		}
 		if len(groupMissing) == 0 {
-			anyPlatformOK = true
+			anyTreeOK = true
 		}
-		platformMissing = append(platformMissing, groupMissing)
+		treeMissing = append(treeMissing, groupMissing)
 	}
-	if !anyPlatformOK {
-		for _, gm := range platformMissing {
+	if !anyTreeOK {
+		for _, gm := range treeMissing {
 			missing = append(missing, gm...)
 		}
 	}
@@ -200,7 +206,7 @@ func validateAssets() {
 	b.WriteString("\n")
 	b.WriteString(dimStyle.Render("  Place the extracted game assets under server/assets/ and try again."))
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("  At least one of assets/revisions/0/android/ or assets/revisions/0/ios/ must be fully present."))
+	b.WriteString(dimStyle.Render("  At least one of assets/revisions/0/, assets/revisions/0/android/, or assets/revisions/0/ios/ must be fully present."))
 	b.WriteString("\n")
 	b.WriteString(dimStyle.Render("  Get them from ") + hlStyle.Render("#resources") + dimStyle.Render(" on Discord: ") + hlStyle.Hyperlink("https://discord.com/invite/MZAf5aVkJG").Render("https://discord.com/invite/MZAf5aVkJG"))
 	b.WriteString("\n")
