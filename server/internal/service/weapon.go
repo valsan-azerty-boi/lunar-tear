@@ -122,8 +122,26 @@ func (s *WeaponServiceServer) EnhanceByMaterial(ctx context.Context, req *pb.Enh
 		}
 
 		weapon.Exp += totalExp
-		if thresholds, ok := catalog.ExpByEnhanceId[wm.WeaponSpecificEnhanceId]; ok {
+		levelingEnhanceId := catalog.LevelingEnhanceIdByWeaponId[weapon.WeaponId]
+		if thresholds, ok := catalog.ExpByEnhanceId[levelingEnhanceId]; ok {
 			weapon.Level, weapon.Exp = gameutil.LevelAndCap(weapon.Exp, thresholds)
+			if maxFunc, ok := catalog.MaxLevelByEnhanceId[wm.WeaponSpecificEnhanceId]; ok {
+				cap := maxFunc.Evaluate(weapon.LimitBreakCount)
+				if weapon.Level > cap {
+					weapon.Level = cap
+					if int(cap) >= 0 && int(cap) < len(thresholds) {
+						weapon.Exp = thresholds[cap]
+					}
+				}
+			}
+		}
+
+		note := user.WeaponNotes[weapon.WeaponId]
+		if note.MaxLevel < weapon.Level {
+			note.WeaponId = weapon.WeaponId
+			note.MaxLevel = weapon.Level
+			note.LatestVersion = nowMillis
+			user.WeaponNotes[weapon.WeaponId] = note
 		}
 
 		weapon.LatestVersion = nowMillis
@@ -240,9 +258,51 @@ func (s *WeaponServiceServer) Evolve(ctx context.Context, req *pb.EvolveRequest)
 			log.Printf("[WeaponService] Evolve: gold cost=%d", goldCost)
 		}
 
+		oldWeaponId := wm.WeaponId
 		weapon.WeaponId = evolvedId
 		weapon.LatestVersion = nowMillis
 		user.Weapons[req.UserWeaponUuid] = weapon
+
+		note, hasNote := user.WeaponNotes[evolvedId]
+		if !hasNote {
+			note = store.WeaponNoteState{
+				WeaponId:                 evolvedId,
+				MaxLevel:                 weapon.Level,
+				MaxLimitBreakCount:       weapon.LimitBreakCount,
+				FirstAcquisitionDatetime: nowMillis,
+				LatestVersion:            nowMillis,
+			}
+			user.WeaponNotes[evolvedId] = note
+		} else {
+			changed := false
+			if note.MaxLevel < weapon.Level {
+				note.MaxLevel = weapon.Level
+				changed = true
+			}
+			if note.MaxLimitBreakCount < weapon.LimitBreakCount {
+				note.MaxLimitBreakCount = weapon.LimitBreakCount
+				changed = true
+			}
+			if changed {
+				note.WeaponId = evolvedId
+				note.LatestVersion = nowMillis
+				user.WeaponNotes[evolvedId] = note
+			}
+		}
+
+		if oldStory, hasOldStory := user.WeaponStories[oldWeaponId]; hasOldStory {
+			newStory, hasNewStory := user.WeaponStories[evolvedId]
+			if !hasNewStory || newStory.ReleasedMaxStoryIndex < oldStory.ReleasedMaxStoryIndex {
+				if user.WeaponStories == nil {
+					user.WeaponStories = make(map[int32]store.WeaponStoryState)
+				}
+				user.WeaponStories[evolvedId] = store.WeaponStoryState{
+					WeaponId:              evolvedId,
+					ReleasedMaxStoryIndex: oldStory.ReleasedMaxStoryIndex,
+					LatestVersion:         nowMillis,
+				}
+			}
+		}
 
 		evolvedMaster, ok := catalog.Weapons[evolvedId]
 		if ok {
@@ -259,7 +319,7 @@ func (s *WeaponServiceServer) Evolve(ctx context.Context, req *pb.EvolveRequest)
 			}
 		}
 
-		log.Printf("[WeaponService] Evolve: weaponId %d -> %d", wm.WeaponId, evolvedId)
+		log.Printf("[WeaponService] Evolve: weaponId %d -> %d", oldWeaponId, evolvedId)
 
 		checkWeaponStoryUnlocks(catalog, user, evolvedId, weapon.Level, nowMillis)
 	})
@@ -657,7 +717,8 @@ func (s *WeaponServiceServer) EnhanceByWeapon(ctx context.Context, req *pb.Enhan
 				continue
 			}
 
-			baseExp := catalog.BaseExpByEnhanceId[matMaster.WeaponSpecificEnhanceId]
+			matLevelingEnhanceId := catalog.LevelingEnhanceIdByWeaponId[matWeapon.WeaponId]
+			baseExp := catalog.BaseExpByEnhanceId[matLevelingEnhanceId]
 			if matMaster.WeaponType != 0 && matMaster.WeaponType == wm.WeaponType {
 				baseExp = baseExp * config.MaterialSameWeaponExpCoefficientPermil / 1000
 			}
@@ -683,8 +744,26 @@ func (s *WeaponServiceServer) EnhanceByWeapon(ctx context.Context, req *pb.Enhan
 		}
 
 		weapon.Exp += totalExp
-		if thresholds, ok := catalog.ExpByEnhanceId[wm.WeaponSpecificEnhanceId]; ok {
+		levelingEnhanceId := catalog.LevelingEnhanceIdByWeaponId[weapon.WeaponId]
+		if thresholds, ok := catalog.ExpByEnhanceId[levelingEnhanceId]; ok {
 			weapon.Level, weapon.Exp = gameutil.LevelAndCap(weapon.Exp, thresholds)
+			if maxFunc, ok := catalog.MaxLevelByEnhanceId[wm.WeaponSpecificEnhanceId]; ok {
+				cap := maxFunc.Evaluate(weapon.LimitBreakCount)
+				if weapon.Level > cap {
+					weapon.Level = cap
+					if int(cap) >= 0 && int(cap) < len(thresholds) {
+						weapon.Exp = thresholds[cap]
+					}
+				}
+			}
+		}
+
+		note := user.WeaponNotes[weapon.WeaponId]
+		if note.MaxLevel < weapon.Level {
+			note.WeaponId = weapon.WeaponId
+			note.MaxLevel = weapon.Level
+			note.LatestVersion = nowMillis
+			user.WeaponNotes[weapon.WeaponId] = note
 		}
 
 		weapon.LatestVersion = nowMillis

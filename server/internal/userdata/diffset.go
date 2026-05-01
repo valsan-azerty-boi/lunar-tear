@@ -3,6 +3,7 @@ package userdata
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 
 	pb "lunar-tear/server/gen/proto"
@@ -114,6 +115,34 @@ func ComputeDeleteKeys(oldRecords, newRecords []map[string]any, keyFields []stri
 		return "[]"
 	}
 	b, err := json.Marshal(deleted)
+	if err != nil {
+		return "[]"
+	}
+	return string(b)
+}
+
+func ComputeUpdateRecords(oldRecords, newRecords []map[string]any, keyFields []string) string {
+	if len(newRecords) == 0 {
+		return "[]"
+	}
+
+	oldByKey := make(map[string]map[string]any, len(oldRecords))
+	for _, r := range oldRecords {
+		oldByKey[compositeKey(r, keyFields)] = r
+	}
+
+	var changed []map[string]any
+	for _, r := range newRecords {
+		prev, exists := oldByKey[compositeKey(r, keyFields)]
+		if !exists || !reflect.DeepEqual(prev, r) {
+			changed = append(changed, r)
+		}
+	}
+
+	if len(changed) == 0 {
+		return "[]"
+	}
+	b, err := json.Marshal(changed)
 	if err != nil {
 		return "[]"
 	}

@@ -42,6 +42,8 @@ type WeaponCatalog struct {
 	BaseExpByEnhanceId                  map[int32]int32
 	ReleaseConditionsByGroupId          map[int32][]EntityMWeaponStoryReleaseConditionGroup
 
+	LevelingEnhanceIdByWeaponId map[int32]int32
+
 	AwakenByWeaponId         map[int32]EntityMWeaponAwaken
 	AwakenMaterialsByGroupId map[int32][]EntityMWeaponAwakenMaterialGroup
 }
@@ -141,6 +143,8 @@ func LoadWeaponCatalog(matCatalog *MaterialCatalog) (*WeaponCatalog, error) {
 		LimitBreakCostByMaterialByEnhanceId: make(map[int32]NumericalFunc, len(enhanceRows)),
 		BaseExpByEnhanceId:                  make(map[int32]int32, len(enhanceRows)),
 		ReleaseConditionsByGroupId:          make(map[int32][]EntityMWeaponStoryReleaseConditionGroup),
+
+		LevelingEnhanceIdByWeaponId: make(map[int32]int32, len(weapons)),
 
 		AwakenByWeaponId:         make(map[int32]EntityMWeaponAwaken, len(awakenRows)),
 		AwakenMaterialsByGroupId: make(map[int32][]EntityMWeaponAwakenMaterialGroup),
@@ -341,6 +345,29 @@ func LoadWeaponCatalog(matCatalog *MaterialCatalog) (*WeaponCatalog, error) {
 		fallbackCount++
 	}
 	log.Printf("[WeaponCatalog] rarity fallback: assigned synthetic enhance IDs to %d weapons", fallbackCount)
+
+	// Build LevelingEnhanceIdByWeaponId: every member of an evolution chain
+	// inherits the chain root's (post-rarity-fallback) WeaponSpecificEnhanceId
+	// so cumulative exp stays consistent across Evolve. Weapons not in any
+	// chain map to their own enhance id.
+	for _, rows := range grouped {
+		if len(rows) == 0 {
+			continue
+		}
+		rootMaster, ok := catalog.Weapons[rows[0].WeaponId]
+		if !ok {
+			continue
+		}
+		rootEnhanceId := rootMaster.WeaponSpecificEnhanceId
+		for _, row := range rows {
+			catalog.LevelingEnhanceIdByWeaponId[row.WeaponId] = rootEnhanceId
+		}
+	}
+	for wid, w := range catalog.Weapons {
+		if _, exists := catalog.LevelingEnhanceIdByWeaponId[wid]; !exists {
+			catalog.LevelingEnhanceIdByWeaponId[wid] = w.WeaponSpecificEnhanceId
+		}
+	}
 
 	return catalog, nil
 }

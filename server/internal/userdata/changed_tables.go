@@ -294,17 +294,16 @@ func ComputeDelta(before, after *store.UserState, changedTables []string) map[st
 	diff := make(map[string]*pb.DiffData, len(changedTables))
 	for _, table := range changedTables {
 		afterJSON := projectTable(table, *after)
+		updates := afterJSON
 		deleteKeys := "[]"
 		if kf := keyFieldsForTable(table); len(kf) > 0 {
-			beforeJSON := projectTable(table, *before)
-			deleteKeys = ComputeDeleteKeys(
-				parseJSONRecords(beforeJSON),
-				parseJSONRecords(afterJSON),
-				kf,
-			)
+			beforeRecs := parseJSONRecords(projectTable(table, *before))
+			afterRecs := parseJSONRecords(afterJSON)
+			updates = ComputeUpdateRecords(beforeRecs, afterRecs, kf)
+			deleteKeys = ComputeDeleteKeys(beforeRecs, afterRecs, kf)
 		}
 		diff[table] = &pb.DiffData{
-			UpdateRecordsJson: afterJSON,
+			UpdateRecordsJson: updates,
 			DeleteKeysJson:    deleteKeys,
 		}
 	}
