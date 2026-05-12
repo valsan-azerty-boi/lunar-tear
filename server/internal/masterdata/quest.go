@@ -34,7 +34,6 @@ type QuestCatalog struct {
 	TutorialUnlockConditions           []EntityMTutorialUnlockCondition
 	ChapterLastSceneByQuestId          map[int32]int32
 	SeasonIdByRouteId                  map[int32]int32
-	QuestsWithDifficulty               map[int32]bool // any questId referenced in m_quest_relation_main_flow
 	BattleOnlyTargetSceneByQuestId     map[int32]int32
 
 	UserExpThresholds       []int32
@@ -238,21 +237,6 @@ func LoadQuestCatalog(partsCatalog *PartsCatalog) (*QuestCatalog, error) {
 	tutorialUnlockConds, err := utils.ReadTable[EntityMTutorialUnlockCondition]("m_tutorial_unlock_condition")
 	if err != nil {
 		return nil, fmt.Errorf("load tutorial unlock condition table: %w", err)
-	}
-
-	relations, err := utils.ReadTable[EntityMQuestRelationMainFlow]("m_quest_relation_main_flow")
-	if err != nil {
-		return nil, fmt.Errorf("load quest relation main flow table: %w", err)
-	}
-	questsWithDifficulty := make(map[int32]bool, len(relations)*3)
-	for _, r := range relations {
-		questsWithDifficulty[r.MainFlowQuestId] = true
-		if r.ReplayFlowQuestId != 0 {
-			questsWithDifficulty[r.ReplayFlowQuestId] = true
-		}
-		if r.SubFlowQuestId != 0 {
-			questsWithDifficulty[r.SubFlowQuestId] = true
-		}
 	}
 
 	battleOnlyTargetSceneByQuestId := make(map[int32]int32)
@@ -555,7 +539,6 @@ func LoadQuestCatalog(partsCatalog *PartsCatalog) (*QuestCatalog, error) {
 		TutorialUnlockConditions:           tutorialUnlockConds,
 		ChapterLastSceneByQuestId:          chapterLastSceneByQuestId,
 		SeasonIdByRouteId:                  seasonIdByRouteId,
-		QuestsWithDifficulty:               questsWithDifficulty,
 		BattleOnlyTargetSceneByQuestId:     battleOnlyTargetSceneByQuestId,
 
 		UserExpThresholds:       BuildExpThresholds(paramMapRows, 1),
@@ -579,6 +562,3 @@ func (q *QuestCatalog) BattleOnlyTargetSceneIdFor(questId int32) (int32, bool) {
 	return v, ok
 }
 
-func (q *QuestCatalog) QuestHasDifficulty(questId int32) bool {
-	return q.QuestsWithDifficulty[questId]
-}

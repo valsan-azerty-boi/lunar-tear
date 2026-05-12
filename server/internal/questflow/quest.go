@@ -62,7 +62,7 @@ func (h *QuestHandler) handleQuestStartInternal(user *store.UserState, questId i
 	questState.UserDeckNumber = userDeckNumber
 
 	isCleared := questState.QuestStateType == model.UserQuestStateTypeCleared
-	isMenuPick := !isReplayFlow && !isMainFlow && (isCleared || h.QuestHasDifficulty(questId))
+	isMenuPick := !isReplayFlow && !isMainFlow
 
 	switch {
 	case isMenuPick:
