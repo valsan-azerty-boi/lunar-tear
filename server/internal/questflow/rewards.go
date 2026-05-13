@@ -13,7 +13,7 @@ import (
 func (h *QuestHandler) isQuestCleared(user *store.UserState, questId int32) bool {
 	quest, ok := user.Quests[questId]
 	if !ok {
-		panic(fmt.Sprintf("unknown questId=%d for isQuestCleared", questId))
+		return false
 	}
 	return quest.QuestStateType == model.UserQuestStateTypeCleared
 }
