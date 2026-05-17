@@ -84,7 +84,7 @@ func (h *QuestHandler) handleQuestStartInternal(user *store.UserState, questId i
 		}
 
 	case isReplayFlow:
-		h.applyReplayStart(user, questId, isBattleOnly, nowMillis)
+		h.applyReplayStart(user, quest, questId, isBattleOnly, nowMillis)
 		return
 	}
 
@@ -131,9 +131,7 @@ func snapshotMainQuestIfNeeded(user *store.UserState) {
 	}
 }
 
-// Preserve CurrentQuestFlowType when HandleReplayFlowSceneProgress already
-// set it: replay-variant ids (30000+) aren't in RouteIdByQuestId.
-func (h *QuestHandler) applyReplayStart(user *store.UserState, questId int32, isBattleOnly bool, nowMillis int64) {
+func (h *QuestHandler) applyReplayStart(user *store.UserState, quest masterdata.EntityMQuest, questId int32, isBattleOnly bool, nowMillis int64) {
 	flowType := h.replayFlowTypeFromQuestId(user, questId)
 	if model.IsReplayQuestFlowType(user.MainQuest.CurrentQuestFlowType) {
 		flowType = model.QuestFlowType(user.MainQuest.CurrentQuestFlowType)
@@ -142,12 +140,26 @@ func (h *QuestHandler) applyReplayStart(user *store.UserState, questId int32, is
 	user.MainQuest.LatestVersion = nowMillis
 
 	questState := user.Quests[questId]
-	questState.QuestStateType = model.UserQuestStateTypeActive
 	questState.LatestStartDatetime = nowMillis
-	user.Quests[questId] = questState
 
-	log.Printf("[HandleQuestStart] replay quest=%d flowType=%s isBattleOnly=%v current=%d head=%d",
-		questId, flowType, isBattleOnly,
+	if isMainQuestPlayable(quest) {
+		questState.QuestStateType = model.UserQuestStateTypeActive
+		user.Quests[questId] = questState
+	} else {
+		if questState.QuestStateType != model.UserQuestStateTypeCleared {
+			questState.QuestStateType = model.UserQuestStateTypeCleared
+			questState.ClearCount++
+			questState.DailyClearCount++
+			questState.LastClearDatetime = nowMillis
+		}
+		user.Quests[questId] = questState
+		if sceneIds := h.SceneIdsByQuestId[questId]; len(sceneIds) > 0 {
+			h.advanceReplayFlowScene(user, sceneIds[0])
+		}
+	}
+
+	log.Printf("[HandleQuestStart] replay quest=%d flowType=%s isBattleOnly=%v playable=%v current=%d head=%d",
+		questId, flowType, isBattleOnly, isMainQuestPlayable(quest),
 		user.MainQuest.ReplayFlowCurrentQuestSceneId,
 		user.MainQuest.ReplayFlowHeadQuestSceneId)
 }

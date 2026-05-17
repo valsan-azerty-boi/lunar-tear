@@ -51,8 +51,14 @@ func (h *QuestHandler) advanceMainFlowScene(user *store.UserState, questId, scen
 	}
 }
 
-// Backs IUserMainQuestSeasonRoute: the client needs the history to load
-// scene metadata when cage menu-replay jumps to older chapters.
+func (h *QuestHandler) advanceReplayFlowScene(user *store.UserState, sceneId int32) {
+	if !h.isSceneAhead(sceneId, user.MainQuest.ReplayFlowHeadQuestSceneId) {
+		return
+	}
+	user.MainQuest.ReplayFlowCurrentQuestSceneId = sceneId
+	user.MainQuest.ReplayFlowHeadQuestSceneId = sceneId
+}
+
 func RecordSeasonRoute(user *store.UserState, seasonId, routeId int32, nowMillis int64) {
 	if seasonId <= 0 || routeId <= 0 {
 		return
@@ -175,6 +181,12 @@ func (h *QuestHandler) replayFlowTypeForRoute(user *store.UserState, routeId int
 		if key.MainQuestSeasonId == seasonId && entry.MainQuestRouteId != routeId {
 			return model.QuestFlowTypeAnotherRouteReplayFlow
 		}
+	}
+	if len(user.MainQuestSeasonRoutes) == 0 &&
+		user.MainQuest.MainQuestSeasonId == seasonId &&
+		user.MainQuest.CurrentMainQuestRouteId != 0 &&
+		user.MainQuest.CurrentMainQuestRouteId != routeId {
+		return model.QuestFlowTypeAnotherRouteReplayFlow
 	}
 	return model.QuestFlowTypeReplayFlow
 }
